@@ -6,10 +6,13 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import pyrootutils
+
+pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+
 import comet_ml  # noqa: F401  # we need to import comet_ml before torch for correct logging
 import hydra
 import lightning as L
-import pyrootutils
 import torch
 from hydra import compose
 from hydra.core.config_store import ConfigStore
@@ -31,7 +34,6 @@ from gabbro.utils.utils import (
     task_wrapper,
 )
 
-pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 # the setup_root above is equivalent to:
 # - adding project root dir to PYTHONPATH

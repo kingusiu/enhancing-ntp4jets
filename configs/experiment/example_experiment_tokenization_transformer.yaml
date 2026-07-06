@@ -26,7 +26,7 @@ run_note: ""
 seed: null
 
 data:
-  data_dir: /data/dust/user/birkjosc/datasets/jetclass/JetClass
+  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass
   batch_size:
     train: 500
     val: 2000
