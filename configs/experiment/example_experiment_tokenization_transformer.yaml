@@ -26,7 +26,7 @@ run_note: ""
 seed: null
 
 data:
-  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass
+  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia
   batch_size:
     train: 500
     val: 2000
@@ -73,8 +73,6 @@ model:
     weight_decay: 1e-2
     betas: [0.95, 0.999]
     eps: 1e-5
-    alpha: 0.5
-    k: 6
   # --- learning rate scheduler ---
   scheduler:
     _target_: torch.optim.lr_scheduler.ConstantLR
