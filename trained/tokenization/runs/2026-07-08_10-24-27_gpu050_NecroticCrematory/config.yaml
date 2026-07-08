@@ -1,0 +1,275 @@
+task_name: tokenization
+tags:
+- vqvae_tokenization
+train: true
+test: true
+test_only_on_rank_zero: true
+ckpt_path: null
+seed: null
+ckpt_path_for_evaluation: null
+output_dir_resub: null
+dataset_size_id: null
+data:
+  dataset_kwargs_train:
+    logger_name: IterDataset-Train
+    shuffle_files: true
+    shuffle_data: true
+    seed: 42
+    max_n_files_per_type: null
+    n_jets_per_file: 100000
+    files_dict:
+      QCD:
+      - ${data.data_dir}/train_100M/ZJetsToNuNu_*
+      Hbb:
+      - ${data.data_dir}/train_100M/HToBB_*
+      Hcc:
+      - ${data.data_dir}/train_100M/HToCC_*
+      Hgg:
+      - ${data.data_dir}/train_100M/HToGG_*
+      H4q:
+      - ${data.data_dir}/train_100M/HToWW4Q_*
+      Hqql:
+      - ${data.data_dir}/train_100M/HToWW2Q1L_*
+      Zqq:
+      - ${data.data_dir}/train_100M/ZToQQ_*
+      Wqq:
+      - ${data.data_dir}/train_100M/WToQQ_*
+      Tbqq:
+      - ${data.data_dir}/train_100M/TTBar_*
+      Tbl:
+      - ${data.data_dir}/train_100M/TTBarLep_*
+    n_files_at_once: 10
+    load_only_once: false
+  dataset_kwargs_val:
+    logger_name: IterDataset-Validation
+    shuffle_files: false
+    shuffle_data: true
+    seed_shuffle_data: 42
+    max_n_files_per_type: 1
+    files_dict:
+      QCD:
+      - ${data.data_dir}/val_5M/ZJetsToNuNu_*
+      Hbb:
+      - ${data.data_dir}/val_5M/HToBB_*
+      Hcc:
+      - ${data.data_dir}/val_5M/HToCC_*
+      Hgg:
+      - ${data.data_dir}/val_5M/HToGG_*
+      H4q:
+      - ${data.data_dir}/val_5M/HToWW4Q_*
+      Hqql:
+      - ${data.data_dir}/val_5M/HToWW2Q1L_*
+      Zqq:
+      - ${data.data_dir}/val_5M/ZToQQ_*
+      Wqq:
+      - ${data.data_dir}/val_5M/WToQQ_*
+      Tbqq:
+      - ${data.data_dir}/val_5M/TTBar_*
+      Tbl:
+      - ${data.data_dir}/val_5M/TTBarLep_*
+    n_files_at_once: 10
+    load_only_once: true
+    shuffle_only_once: true
+    n_jets_per_file: 10000
+  dataset_kwargs_test:
+    logger_name: IterDataset-Test
+    shuffle_files: false
+    shuffle_data: true
+    seed_shuffle_data: 42
+    max_n_files_per_type: 1
+    files_dict:
+      QCD:
+      - ${data.data_dir}/test_20M/ZJetsToNuNu_*
+      Hbb:
+      - ${data.data_dir}/test_20M/HToBB_*
+      Hcc:
+      - ${data.data_dir}/test_20M/HToCC_*
+      Hgg:
+      - ${data.data_dir}/test_20M/HToGG_*
+      H4q:
+      - ${data.data_dir}/test_20M/HToWW4Q_*
+      Hqql:
+      - ${data.data_dir}/test_20M/HToWW2Q1L_*
+      Zqq:
+      - ${data.data_dir}/test_20M/ZToQQ_*
+      Wqq:
+      - ${data.data_dir}/test_20M/WToQQ_*
+      Tbqq:
+      - ${data.data_dir}/test_20M/TTBar_*
+      Tbl:
+      - ${data.data_dir}/test_20M/TTBarLep_*
+    n_files_at_once: 10
+    load_only_once: true
+    shuffle_only_once: true
+    n_jets_per_file: 20000
+  batch_size:
+    train: 500
+    val: 2000
+    test: 2000
+  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia
+  _target_: gabbro.data.iterable_dataset_jetclass.IterableDatamodule
+  dataset_kwargs_common:
+    pad_length: 128
+    labels_to_load:
+    - label_QCD
+    - label_Hbb
+    - label_Hcc
+    - label_Hgg
+    - label_H4q
+    - label_Hqql
+    - label_Zqq
+    - label_Wqq
+    - label_Tbqq
+    - label_Tbl
+    shuffle_particles: true
+    n_files_at_once: 10
+    load_only_once: false
+    feature_dict: ${feature_dict}
+    feature_dict_jet: null
+model:
+  _target_: gabbro.models.vqvae.VQVAELightning
+  model_type: VQVAETransformer
+  model_kwargs:
+    hidden_dim: 128
+    latent_dim: 8
+    num_blocks: 4
+    num_heads: 8
+    alpha: 10
+    vq_kwargs:
+      num_codes: 8192
+      beta: 0.9
+      kmeans_init: false
+      norm: null
+      cb_norm: null
+      affine_lr: 2
+      sync_nu: 1
+      replace_freq: 500
+      dim: -1
+    old_transformer_implementation: false
+    in_out_proj_cfg: null
+    latent_proj_cfg: null
+    input_features_dict: ${feature_dict}
+    causal_decoder: true
+    conditional_dim: 0
+    max_sequence_len: 128
+    transformer_cfg:
+      attn_cfg:
+        num_heads: ${model.model_kwargs.num_heads}
+        dropout_rate: 0.0
+        norm_before: true
+        norm_after: false
+      mlp_cfg:
+        expansion_factor: 4
+        dropout_rate: 0.0
+        norm_before: true
+        activation: GELU
+      residual_cfg:
+        gate_type: local
+        init_value: 1.0
+  optimizer:
+    _target_: gabbro.utils.optimizer.ranger.Ranger
+    _partial_: true
+    lr: 0.001
+    weight_decay: 0.01
+    betas:
+    - 0.95
+    - 0.999
+    eps: 1.0e-05
+  scheduler:
+    _target_: torch.optim.lr_scheduler.ConstantLR
+    _partial_: true
+    total_iters: 1
+    factor: 1
+  model_kwargs_loaded: null
+  scheduler_lightning_kwargs:
+    monitor: val_loss
+    interval: step
+    frequency: 1
+callbacks:
+  model_checkpoint:
+    _target_: gabbro.callbacks.checkpoint_callback.CustomModelCheckpoint
+    state_key: General-checkpoint-callback
+    dirpath: ${paths.output_dir}/checkpoints
+    filename: epoch_{epoch:03d}_loss_{val_loss:.5f}
+    monitor: val_loss
+    verbose: true
+    save_last: true
+    save_top_k: -1
+    mode: min
+    auto_insert_metric_name: false
+    save_weights_only: false
+    every_n_train_steps: null
+    train_time_interval: null
+    every_n_epochs: 1
+    save_on_train_epoch_end: false
+  model_summary:
+    _target_: lightning.pytorch.callbacks.RichModelSummary
+    max_depth: -1
+  lr_monitor:
+    _target_: lightning.pytorch.callbacks.LearningRateMonitor
+    logging_interval: step
+    log_momentum: false
+  tokenization_callback:
+    _target_: gabbro.callbacks.tokenization_callback.TokenizationEvalCallback
+feature_dict:
+  part_pt:
+    multiply_by: 1
+    subtract_by: 1.8
+    func: signed_log
+    inv_func: signed_exp
+  part_etarel:
+    multiply_by: 3
+  part_phirel:
+    multiply_by: 3
+logger:
+  comet:
+    _target_: lightning.pytorch.loggers.comet.CometLogger
+    api_key: ${oc.env:COMET_API_TOKEN}
+    save_dir: ${paths.output_dir}
+    project_name: ${project_name}
+    rest_api_key: null
+    experiment_key: bc664de571614a2d9b01431ef12499e3
+    offline: false
+    prefix: ''
+    experiment_name: gpu050
+  csv:
+    _target_: lightning.pytorch.loggers.csv_logs.CSVLogger
+    save_dir: ${paths.output_dir}
+    name: csv/
+    prefix: ''
+  wandb:
+    project: ${project_name}
+    tags: ${tags}
+    name: gpu050
+trainer:
+  _target_: lightning.Trainer
+  default_root_dir: ${paths.output_dir}
+  min_epochs: 1
+  accelerator: gpu
+  devices: 1
+  num_nodes: 1
+  strategy: auto
+  enable_progress_bar: false
+  check_val_every_n_epoch: 1
+  deterministic: false
+  max_steps: 1000000
+  gradient_clip_val: 5
+  log_every_n_steps: 10
+  limit_train_batches: ${eval:'int(${data.dataset_kwargs_train.n_files_at_once} *
+    ${data.dataset_kwargs_train.n_jets_per_file} / ${data.batch_size.train} / ${trainer.devices}
+    / ${trainer.num_nodes})'}
+  limit_val_batches: ${eval:'int(${data.dataset_kwargs_val.n_files_at_once} * ${data.dataset_kwargs_val.n_jets_per_file}
+    / ${data.batch_size.val} / ${trainer.devices} / ${trainer.num_nodes})'}
+paths:
+  log_dir: ${oc.env:LOG_DIR}
+  output_dir: ${hydra:run.dir}
+  work_dir: ${hydra:runtime.cwd}
+extras:
+  ignore_warnings: false
+  enforce_tags: true
+  print_config: true
+load_weights_from: false
+load_weights_strict: false
+continue_from_checkpoint: null
+project_name: tokenization
+run_note: ''

@@ -232,6 +232,7 @@ class TokenizationEvalCallback(L.Callback):
             flatten=False,
         )
         fig.savefig(plot_filename)
+        plt.close(fig)
         if self.comet_logger is not None:
             self.comet_logger.log_image(
                 plot_filename, name=plot_filename.split("/")[-1], step=trainer.global_step
@@ -343,6 +344,7 @@ class TokenizationEvalCallback(L.Callback):
             )
             fig_jet_features_this_type.tight_layout()
             fig_jet_features_this_type.savefig(filename_jet_features_this_type)
+            plt.close(fig_jet_features_this_type)
             pylogger.info(f"Saved jet features plot to {filename_jet_features_this_type}")
 
             # --- resolution / different to original plots
@@ -384,6 +386,7 @@ class TokenizationEvalCallback(L.Callback):
             )
             fig_jet_features_res_this_type.tight_layout()
             fig_jet_features_res_this_type.savefig(filename_jet_features_res_this_type)
+            plt.close(fig_jet_features_res_this_type)
             pylogger.info(
                 f"Saved jet features resolution plot to {filename_jet_features_res_this_type}"
             )
@@ -472,6 +475,7 @@ class TokenizationEvalCallback(L.Callback):
                 rep, f"_particle_features_{jet_type}"
             )
             fig_part_features_this_type.savefig(filename_part_features_this_type)
+            plt.close(fig_part_features_this_type)
             pylogger.info(f"Saved particle features plot to {filename_part_features_this_type}")
 
             # --- plot difference to original of particle features
@@ -546,11 +550,10 @@ class TokenizationEvalCallback(L.Callback):
                 rep, f"_particle_features_res_{jet_type}"
             )
             fig_part_features_res_this_type.savefig(filename_part_features_res_this_type)
+            plt.close(fig_part_features_res_this_type)
             pylogger.info(
                 f"Saved particle features resolution plot to {filename_part_features_res_this_type}"
             )
-
-            plt.show()
 
             # log the plots
             if self.comet_logger is not None:
@@ -563,8 +566,6 @@ class TokenizationEvalCallback(L.Callback):
                     self.comet_logger.log_image(
                         fname, name=fname.split("/")[-1], step=trainer.global_step
                     )
-
-            plt.close()
 
         # calculate the mean abs error of the jet p4s
         ak_mean_abs_err_jet_features = ak_mean(
