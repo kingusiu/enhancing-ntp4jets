@@ -72,10 +72,14 @@ class TokenizationEvalCallback(L.Callback):
         self.save_results_arrays = save_result_arrays
 
     def on_validation_epoch_end(self, trainer, pl_module):
+        if not trainer.is_global_zero:
+            return
         pl_module.concat_validation_loop_predictions()
         self.plot(trainer, pl_module, stage="val")
 
     def on_test_epoch_end(self, trainer, pl_module):
+        if not trainer.is_global_zero:
+            return
         pl_module.concat_test_loop_predictions()
         self.plot(trainer, pl_module, stage="test")
 
