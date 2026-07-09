@@ -58,8 +58,8 @@ trainer:
   max_steps: 1_000_000
   gradient_clip_val: 5
   log_every_n_steps: 10
-  devices: 1
-  num_nodes: 1
+  devices: 4
+  num_nodes: 2
   limit_train_batches: ${eval:'int(${data.dataset_kwargs_train.n_files_at_once} * ${data.dataset_kwargs_train.n_jets_per_file} / ${data.batch_size.train} / ${trainer.devices} / ${trainer.num_nodes})'}
   limit_val_batches: ${eval:'int(${data.dataset_kwargs_val.n_files_at_once} * ${data.dataset_kwargs_val.n_jets_per_file} / ${data.batch_size.val} / ${trainer.devices} / ${trainer.num_nodes})'}
 

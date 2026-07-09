@@ -228,10 +228,10 @@ logger:
     save_dir: ${paths.output_dir}
     project_name: ${project_name}
     rest_api_key: null
-    experiment_key: bc664de571614a2d9b01431ef12499e3
+    experiment_key: 443a1adfbbab4791bbb191d9d39a5ecd
     offline: false
     prefix: ''
-    experiment_name: gpu050
+    experiment_name: gpu017
   csv:
     _target_: lightning.pytorch.loggers.csv_logs.CSVLogger
     save_dir: ${paths.output_dir}
@@ -240,18 +240,19 @@ logger:
   wandb:
     project: ${project_name}
     tags: ${tags}
-    name: gpu050
+    name: gpu017
 trainer:
   _target_: lightning.Trainer
   default_root_dir: ${paths.output_dir}
   min_epochs: 1
   accelerator: gpu
-  devices: 1
-  num_nodes: 1
-  strategy: auto
+  devices: 4
+  num_nodes: 2
+  strategy: ddp
   enable_progress_bar: false
   check_val_every_n_epoch: 1
   deterministic: false
+  sync_batchnorm: true
   max_steps: 1000000
   gradient_clip_val: 5
   log_every_n_steps: 10

@@ -121,10 +121,11 @@ hydra:
     - hydra.mode=RUN
     task:
     - experiment=example_experiment_tokenization_transformer
+    - trainer=ddp
   job:
     name: train
     chdir: null
-    override_dirname: experiment=example_experiment_tokenization_transformer
+    override_dirname: experiment=example_experiment_tokenization_transformer,trainer=ddp
     id: ???
     num: ???
     config_name: train.yaml
@@ -152,7 +153,7 @@ hydra:
     - path: ''
       schema: structured
       provider: schema
-    output_dir: /home/users/w/wozniak/dev/enhancing-ntp4jets/trained/tokenization/runs/2026-07-08_10-24-27_gpu050_NecroticCrematory
+    output_dir: /home/users/w/wozniak/dev/enhancing-ntp4jets/trained/tokenization/runs/2026-07-08_22-38-54_gpu017_UnregisteredCornu
     choices:
       debug: null
       local: default.yaml
@@ -161,7 +162,7 @@ hydra:
       hydra: default.yaml
       extras: default.yaml
       paths: default.yaml
-      trainer: gpu.yaml
+      trainer: ddp
       logger: many_loggers.yaml
       feature_dict: feature_dict_kin_massless_without_cuts.yaml
       callbacks: tokenization_callbacks.yaml

@@ -207,7 +207,7 @@ callbacks:
   model_checkpoint:
     _target_: gabbro.callbacks.checkpoint_callback.CustomModelCheckpoint
     state_key: General-checkpoint-callback
-    dirpath: trained/tokenization/runs/2026-07-08_10-24-27_gpu050_NecroticCrematory/checkpoints
+    dirpath: trained/tokenization/runs/2026-07-08_22-38-54_gpu017_UnregisteredCornu/checkpoints
     filename: epoch_{epoch:03d}_loss_{val_loss:.5f}
     monitor: val_loss
     verbose: true
@@ -243,42 +243,43 @@ logger:
   comet:
     _target_: lightning.pytorch.loggers.comet.CometLogger
     api_key: bSH6vlLeei9OzSDWdWXZmNgqU
-    save_dir: trained/tokenization/runs/2026-07-08_10-24-27_gpu050_NecroticCrematory
+    save_dir: trained/tokenization/runs/2026-07-08_22-38-54_gpu017_UnregisteredCornu
     project_name: tokenization
     rest_api_key: null
-    experiment_key: bc664de571614a2d9b01431ef12499e3
+    experiment_key: 443a1adfbbab4791bbb191d9d39a5ecd
     offline: false
     prefix: ''
-    experiment_name: gpu050
+    experiment_name: gpu017
   csv:
     _target_: lightning.pytorch.loggers.csv_logs.CSVLogger
-    save_dir: trained/tokenization/runs/2026-07-08_10-24-27_gpu050_NecroticCrematory
+    save_dir: trained/tokenization/runs/2026-07-08_22-38-54_gpu017_UnregisteredCornu
     name: csv/
     prefix: ''
   wandb:
     project: tokenization
     tags:
     - vqvae_tokenization
-    name: gpu050
+    name: gpu017
 trainer:
   _target_: lightning.Trainer
-  default_root_dir: trained/tokenization/runs/2026-07-08_10-24-27_gpu050_NecroticCrematory
+  default_root_dir: trained/tokenization/runs/2026-07-08_22-38-54_gpu017_UnregisteredCornu
   min_epochs: 1
   accelerator: gpu
-  devices: 1
-  num_nodes: 1
-  strategy: auto
+  devices: 4
+  num_nodes: 2
+  strategy: ddp
   enable_progress_bar: false
   check_val_every_n_epoch: 1
   deterministic: false
+  sync_batchnorm: true
   max_steps: 1000000
   gradient_clip_val: 5
   log_every_n_steps: 10
-  limit_train_batches: 2000
-  limit_val_batches: 50
+  limit_train_batches: 250
+  limit_val_batches: 6
 paths:
   log_dir: trained
-  output_dir: trained/tokenization/runs/2026-07-08_10-24-27_gpu050_NecroticCrematory
+  output_dir: trained/tokenization/runs/2026-07-08_22-38-54_gpu017_UnregisteredCornu
   work_dir: /home/users/w/wozniak/dev/enhancing-ntp4jets
 extras:
   ignore_warnings: false

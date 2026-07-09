@@ -16,8 +16,12 @@ def get_git_status():
     stdout, stderr = process.communicate()
     git_diff_output = stdout.decode("utf-8")
 
-    # replace symbols that make OmegaConf's parser crash
-    git_diff_output = git_diff_output.replace("$", r"\$")
+    # replace symbols that make OmegaConf's parser crash: escaping just the "$"
+    # (e.g. "$" -> "\$") is not enough, since the string "${" is still present
+    # and OmegaConf detects that as the start of an interpolation, then fails
+    # to parse whatever follows (e.g. "${eval:'int(...)'}" from tracked config
+    # files). Insert a space so "${" can never appear in the output.
+    git_diff_output = git_diff_output.replace("$", "$ ")
 
     separator_start = f"\n{100 * '='}\n{'=' * 10} start git diff {'=' * 10}\n"
     separator_end = f"\n{'=' * 10} end git diff {'=' * 10}\n{100 * '='}\n"

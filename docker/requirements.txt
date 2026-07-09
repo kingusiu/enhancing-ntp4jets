@@ -43,7 +43,7 @@ hydra-optuna-sweeper==1.2.0
 
 # --------- loggers --------- #
 comet-ml==3.49.7
-wandb==0.16.6
+wandb>=0.17.5 # 0.16.6 uses np.float_, removed in NumPy 2.0
 
 # --------- dev tools & others --------- #
 black

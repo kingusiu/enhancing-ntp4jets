@@ -1,13 +1,13 @@
 #!/bin/sh
 
 #SBATCH --job-name=train-tokenization-transformer
-#SBATCH --time=38:00:00
+#SBATCH --time=72:00:00
 #SBATCH --partition=private-dpnc-gpu
 #SBATCH --mem=50GB
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=24
-#SBATCH --gpus=1
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=6
+#SBATCH --gpus-per-node=4
 #SBATCH --output=/home/users/w/wozniak/dev/enhancing-ntp4jets/slurm/logs/slurm-%A-%x.out
 #SBATCH --chdir=/home/users/w/wozniak/dev/enhancing-ntp4jets
 
@@ -29,5 +29,7 @@ export PYTHONPATH=${PWD}:${PWD}/python_install:${PYTHONPATH}
 srun apptainer exec \
   --nv -B /srv,/home \
   --env PYTHONNOUSERSITE=1 \
+  --env NCCL_DEBUG=INFO \
+  --env NCCL_DEBUG_SUBSYS=ALL \
   /home/users/w/wozniak/container/omni_alfa_continuous.sif \
-  bash -c "source /opt/conda/bin/activate && export PYTHONPATH=/home/users/w/wozniak/.local/ntp4jets-deps:\$PYTHONPATH && python gabbro/train.py experiment=example_experiment_tokenization_transformer"
+  bash -c "source /opt/conda/bin/activate && export PYTHONPATH=/home/users/w/wozniak/.local/ntp4jets-deps:\$PYTHONPATH && python gabbro/train.py experiment=example_experiment_tokenization_transformer trainer=ddp"
