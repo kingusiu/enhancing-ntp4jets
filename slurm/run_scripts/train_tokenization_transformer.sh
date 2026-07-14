@@ -29,9 +29,6 @@ export PYTHONPATH=${PWD}:${PWD}/python_install:${PYTHONPATH}
 srun apptainer exec \
   --nv -B /srv,/home \
   --env PYTHONNOUSERSITE=1 \
-  --env NCCL_DEBUG=INFO \
-  --env NCCL_DEBUG_SUBSYS=INIT,GRAPH,COLL,NET \
-  --env NCCL_DEBUG_FILE=/home/users/w/wozniak/dev/enhancing-ntp4jets/slurm/logs/nccl-%A-%h-%p.log \
   --env TORCH_NCCL_TRACE_BUFFER_SIZE=2000 \
   --env TORCH_NCCL_DUMP_ON_TIMEOUT=1 \
   --env TORCH_DISTRIBUTED_DEBUG=DETAIL \
