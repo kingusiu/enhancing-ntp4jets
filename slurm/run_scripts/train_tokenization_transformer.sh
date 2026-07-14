@@ -4,7 +4,7 @@
 #SBATCH --time=72:00:00
 #SBATCH --partition=private-dpnc-gpu
 #SBATCH --mem=40GB
-#SBATCH --nodes=2
+#SBATCH --nodes=1
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=6
 #SBATCH --gpus-per-node=4
@@ -30,7 +30,7 @@ srun apptainer exec \
   --nv -B /srv,/home \
   --env PYTHONNOUSERSITE=1 \
   --env NCCL_DEBUG=INFO \
-  --env NCCL_DEBUG_SUBSYS=INIT,GRAPH \
+  --env NCCL_DEBUG_SUBSYS=INIT,GRAPH,COLL,NET \
   --env NCCL_DEBUG_FILE=/home/users/w/wozniak/dev/enhancing-ntp4jets/slurm/logs/nccl-%A-%h-%p.log \
   --env TORCH_NCCL_TRACE_BUFFER_SIZE=2000 \
   --env TORCH_NCCL_DUMP_ON_TIMEOUT=1 \

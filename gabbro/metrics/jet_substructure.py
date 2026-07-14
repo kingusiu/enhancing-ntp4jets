@@ -59,6 +59,34 @@ class JetSubstructure:
             )
             raise ValueError("Jets with too few particles are not allowed.")
 
+        # --- guard against NaN/Inf particle kinematics ---
+        # fastjet's ClusterSequence segfaults (native crash, not a catchable Python
+        # exception) if it receives non-finite pt/eta/phi/mass values, which can happen
+        # e.g. for un-/undertrained reconstructions early in training. Replace any
+        # non-finite particle with a zero-momentum (invisible) particle instead.
+        is_finite = (
+            np.isfinite(ak.Array(particles.pt))
+            & np.isfinite(ak.Array(particles.eta))
+            & np.isfinite(ak.Array(particles.phi))
+            & np.isfinite(ak.Array(particles.mass))
+        )
+        n_nonfinite = ak.sum(~is_finite)
+        if n_nonfinite > 0:
+            pylogger.warning(
+                f"Found {n_nonfinite} particles with non-finite pt/eta/phi/mass values. "
+                "Replacing them with zero-momentum (invisible) particles to avoid crashing "
+                "fastjet's ClusterSequence."
+            )
+            particles = ak.zip(
+                {
+                    "pt": ak.where(is_finite, particles.pt, 0.0),
+                    "eta": ak.where(is_finite, particles.eta, 0.0),
+                    "phi": ak.where(is_finite, particles.phi, 0.0),
+                    "mass": ak.where(is_finite, particles.mass, 0.0),
+                },
+                with_name="Momentum4D",
+            )
+
         if ak.max(particles.pt) > 1e9:
             pylogger.warning(
                 "The pt of (one or more) particles is larger than 1e9. We will clip the pt to 1e9. "

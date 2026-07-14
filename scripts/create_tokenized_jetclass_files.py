@@ -9,7 +9,7 @@ import torch
 from omegaconf import OmegaConf
 
 from gabbro.data.data_tokenization import tokenize_jetclass_file
-from gabbro.utils.binning import BinningTokenizer
+#from gabbro.utils.binning import BinningTokenizer
 from gabbro.utils.pylogger import get_pylogger
 
 log = get_pylogger(__name__)
@@ -245,18 +245,21 @@ def main(
     }
 
     if binning_cfg_path is not None:
-        # initialize the tokenizer and save it there
-        os.system(f"cp {binning_cfg_path} {JETCLASS_DIR_TOKENIZED}/config.yaml")  # nosec
-        # load the config
-        cfg = OmegaConf.load(binning_cfg_path)
-        binning_dict = {
-            key: np.linspace(*cfg.particle_features[key]["binning"])
-            for key in cfg.particle_features
-        }
-        tokenizer = BinningTokenizer(bin_edges_dict=binning_dict)
-        # save the tokenizer
-        model_ckpt_path = JETCLASS_DIR_TOKENIZED / "model_ckpt.ckpt"
-        torch.save(tokenizer, model_ckpt_path)  # nosec
+        raise NotImplementedError(
+            "binningTokenizer class is missing from the repo, use vqvae checkpoint instead"
+        )
+        # # initialize the tokenizer and save it there
+        # os.system(f"cp {binning_cfg_path} {JETCLASS_DIR_TOKENIZED}/config.yaml")  # nosec
+        # # load the config
+        # cfg = OmegaConf.load(binning_cfg_path)
+        # binning_dict = {
+        #     key: np.linspace(*cfg.particle_features[key]["binning"])
+        #     for key in cfg.particle_features
+        # }
+        # tokenizer = BinningTokenizer(bin_edges_dict=binning_dict)
+        # # save the tokenizer
+        # model_ckpt_path = JETCLASS_DIR_TOKENIZED / "model_ckpt.ckpt"
+        # torch.save(tokenizer, model_ckpt_path)  # nosec
     else:
         # copy the checkpoint to the tokenized dir
         os.system(f"cp {ckpt_path} {JETCLASS_DIR_TOKENIZED}")  # nosec

@@ -432,8 +432,15 @@ def plot_features(
             elif flatten:
                 values = ak.flatten(values)
 
-            min_val = min(min_val, np.nanmin(values.to_numpy()))
-            max_val = max(max_val, np.nanmax(values.to_numpy()))
+            values_np = values.to_numpy()
+            if values_np.size == 0:
+                logger.info(
+                    f"Feature '{feat}' in array '{ak_array}' has zero entries, skipping."
+                )
+                continue
+
+            min_val = min(min_val, np.nanmin(values_np))
+            max_val = max(max_val, np.nanmax(values_np))
         bins_dict[feat] = np.linspace(min_val, max_val, n_bins + 1)
 
     for i_label, (label, ak_array) in enumerate(ak_array_dict.items()):
