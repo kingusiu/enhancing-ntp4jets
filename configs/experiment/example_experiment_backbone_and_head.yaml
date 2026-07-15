@@ -139,7 +139,7 @@ data:
     train: 250
     val: 1000
     test: 1000
-  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized/2026-07-09_18-39-06_gpu024_WhitePaddle/ # 8k, kin-only
+  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized/2026-07-09_18-39-06_gpu024_WhitePaddle # 8k, kin-only
   dataset_kwargs_train:
     max_n_files_per_type: 100
     shuffle_files: true
@@ -190,7 +190,7 @@ trainer:
   max_steps: 1_000_000
   gradient_clip_val: 1
   log_every_n_steps: 20
-  devices: 1
+  devices: 4
   num_nodes: 1
   limit_train_batches: 1.0
   limit_val_batches: 1.0

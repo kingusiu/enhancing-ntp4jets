@@ -196,12 +196,12 @@ def main(
     JETCLASS_DIR_TOKENIZED_TEST = JETCLASS_DIR_TOKENIZED / "test_20M"
 
     # raise error if tokenized dir already exists and is non-empty
-    if JETCLASS_DIR_TOKENIZED.exists() and any(JETCLASS_DIR_TOKENIZED.iterdir()):
-        raise FileExistsError(
-            f"Output folder already exists and is not empty: {JETCLASS_DIR_TOKENIZED}"
-            " - please delete it before running this script."
-            f"\n\nrm -rf {JETCLASS_DIR_TOKENIZED}\n"
-        )
+    # if JETCLASS_DIR_TOKENIZED.exists() and any(JETCLASS_DIR_TOKENIZED.iterdir()):
+    #     raise FileExistsError(
+    #         f"Output folder already exists and is not empty: {JETCLASS_DIR_TOKENIZED}"
+    #         " - please delete it before running this script."
+    #         f"\n\nrm -rf {JETCLASS_DIR_TOKENIZED}\n"
+    #     )
 
     # create tokenized dirs
     JETCLASS_DIR_TOKENIZED_TRAIN.mkdir(parents=True, exist_ok=True)
