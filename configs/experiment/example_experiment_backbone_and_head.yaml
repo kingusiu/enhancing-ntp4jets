@@ -10,8 +10,8 @@ defaults:
   - override /callbacks: callbacks_for_multihead_training.yaml
   - override /trainer: ddp.yaml
 
-project_name: "omnijet-multihead"
-tags: [omnijet-multihead]
+project_name: "omnijet-backbone-multihead"
+tags: [omnijet-backbone-multihead]
 
 run_note: ""
 
