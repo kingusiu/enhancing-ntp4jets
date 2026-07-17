@@ -823,9 +823,24 @@ class IterableDatamodule(L.LightningDataModule):
         dataset_kwargs_test: dict,
         dataset_kwargs_common: dict,
         batch_size: int = 256,
+        num_workers: int = 1,
         **kwargs,
     ):
         super().__init__()
+
+        self.num_workers = num_workers
+        if self.num_workers > 1:
+            # CustomIterableDataset does not shard the file list across dataloader
+            # workers (worker_id/num_workers is only used for logging), so using
+            # more than one worker would cause every worker to independently load
+            # and yield the same data, duplicating jets within each batch.
+            get_pylogger(f"{__name__}-{self.__class__.__name__}").warning(
+                f"num_workers={self.num_workers} was requested, but CustomIterableDataset "
+                "does not shard data across workers. Forcing num_workers=1 to avoid "
+                "duplicated data. A single worker is still enough to prefetch the next "
+                "file chunk in the background while the GPU trains on the current one."
+            )
+            self.num_workers = 1
 
         if isinstance(batch_size, int):
             self.batch_size_train = batch_size
@@ -958,12 +973,21 @@ class IterableDatamodule(L.LightningDataModule):
                 **self.hparams.dataset_kwargs_test,
             )
 
+    def _dataloader_kwargs(self):
+        """Common kwargs to enable background prefetching of the next file chunk."""
+        kwargs = {"num_workers": self.num_workers, "pin_memory": True}
+        if self.num_workers > 0:
+            kwargs["persistent_workers"] = True
+            kwargs["prefetch_factor"] = 2
+        return kwargs
+
     def train_dataloader(self):
         collate = self.hparams.dataset_kwargs_train.get("collate", False)
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size_train,
             collate_fn=self.pad_constituents_and_stack if collate else None,
+            **self._dataloader_kwargs(),
         )
 
     def val_dataloader(self):
@@ -972,6 +996,7 @@ class IterableDatamodule(L.LightningDataModule):
             self.val_dataset,
             batch_size=self.batch_size_val,
             collate_fn=self.pad_constituents_and_stack if collate else None,
+            **self._dataloader_kwargs(),
         )
 
     def test_dataloader(self):
@@ -980,4 +1005,5 @@ class IterableDatamodule(L.LightningDataModule):
             self.test_dataset,
             batch_size=self.batch_size_test,
             collate_fn=self.pad_constituents_and_stack if collate else None,
+            **self._dataloader_kwargs(),
         )
