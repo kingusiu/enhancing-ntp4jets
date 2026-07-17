@@ -137,8 +137,8 @@ callbacks:
 data:
   batch_size:
     train: 250
-    val: 1000
-    test: 1000
+    val: 500
+    test: 500
   data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized/2026-07-09_18-39-06_gpu024_WhitePaddle # 8k, kin-only
   dataset_kwargs_train:
     max_n_files_per_type: 100
@@ -146,7 +146,7 @@ data:
     shuffle_data: true
     load_only_once: false
     shuffle_only_once: false
-    n_files_at_once: 6
+    n_files_at_once: 5
     n_jets_per_file: 100_000
   dataset_kwargs_val:
     seed: 1
