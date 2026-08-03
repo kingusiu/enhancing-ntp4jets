@@ -12,8 +12,8 @@ strategy: auto
 enable_progress_bar: False
 
 # mixed precision for extra speed-up
-# precision: 16
-precision: bf16-mixed
+precision: 16
+#precision: bf16-mixed
 
 # perform a validation loop every N training epochs
 check_val_every_n_epoch: 5

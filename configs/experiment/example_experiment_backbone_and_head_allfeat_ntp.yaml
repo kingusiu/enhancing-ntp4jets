@@ -147,7 +147,7 @@ data:
     load_only_once: false
     shuffle_only_once: false
     n_files_at_once: 3
-    n_jets_per_file: 50_000
+    n_jets_per_file: 100_000
   dataset_kwargs_val:
     seed: 1
     random_seed_for_per_file_shuffling: null
@@ -163,7 +163,7 @@ data:
     shuffle_only_once: true
     load_only_once: false
     n_files_at_once: 3
-    n_jets_per_file: 50_000
+    n_jets_per_file: 100_000
   dataset_kwargs_common:
     seed: ${seed}
     dataset_type: jetclass

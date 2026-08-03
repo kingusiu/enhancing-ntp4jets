@@ -2,8 +2,8 @@ defaults:
   - default.yaml
 
 # use "ddp_find_unused_parameters_true" in scenarios with unused parameters
-strategy: ddp_find_unused_parameters_true
-
+#strategy: ddp_find_unused_parameters_true
+strategy: ddp
 accelerator: gpu
 devices: 4 # GPUs per node — match --gpus-per-node in slurm sh script
 num_nodes: 1
