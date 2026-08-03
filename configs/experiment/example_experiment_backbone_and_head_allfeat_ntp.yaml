@@ -4,14 +4,14 @@
 # python train.py experiment=example_experiment_backbone_and_head
 
 defaults:
-  - override /feature_dict: feature_dict_kin_massless_without_cuts.yaml
+  - override /feature_dict: feature_dict_all_without_cuts.yaml
   - override /data: iter_dataset_jetclass_all_types
   - override /model: backbone_multihead.yaml
   - override /callbacks: callbacks_for_multihead_training.yaml
   - override /trainer: ddp.yaml
 
-project_name: "omnijet-backbone-multihead"
-tags: [omnijet-backbone-multihead]
+project_name: "omnijet-backbone-multihead-allfeat-ntp"
+tags: [omnijet-backbone-multihead-allfeat-ntp]
 
 run_note: ""
 
@@ -146,8 +146,8 @@ data:
     shuffle_data: true
     load_only_once: false
     shuffle_only_once: false
-    n_files_at_once: 5
-    n_jets_per_file: 100_000
+    n_files_at_once: 3
+    n_jets_per_file: 50_000
   dataset_kwargs_val:
     seed: 1
     random_seed_for_per_file_shuffling: null
@@ -162,8 +162,8 @@ data:
     max_n_files_per_type: 1
     shuffle_only_once: true
     load_only_once: false
-    n_files_at_once: 10
-    n_jets_per_file: 100_000
+    n_files_at_once: 3
+    n_jets_per_file: 50_000
   dataset_kwargs_common:
     seed: ${seed}
     dataset_type: jetclass

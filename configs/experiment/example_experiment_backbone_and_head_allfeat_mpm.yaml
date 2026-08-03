@@ -10,8 +10,8 @@ defaults:
   - override /callbacks: callbacks_for_multihead_training.yaml
   - override /trainer: ddp.yaml
 
-project_name: "omnijet-backbone-multihead-allfeat-ntp"
-tags: [omnijet-backbone-multihead-allfeat-ntp]
+project_name: "omnijet-backbone-multihead-allfeat-mpm"
+tags: [omnijet-backbone-multihead-allfeat-mpm]
 
 run_note: ""
 
@@ -128,9 +128,9 @@ model:
 
 callbacks:
   early_stopping:
-    patience: 5 # number of checks with no improvement after which training will be stopped
+    patience: 50 # number of checks with no improvement after which training will be stopped
   model_checkpoint:
-    save_top_k: 5 # save k best models (determined by above metric)
+    save_top_k: 7 # save k best models (determined by above metric)
   classification_callback:
     log_images: false
 
@@ -141,7 +141,7 @@ data:
     test: 500
   data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized/2026-07-09_18-39-06_gpu024_WhitePaddle # 8k, kin-only
   dataset_kwargs_train:
-    max_n_files_per_type: 100
+    max_n_files_per_type: 200
     shuffle_files: true
     shuffle_data: true
     load_only_once: false
@@ -159,7 +159,7 @@ data:
     n_files_at_once: 10
     n_jets_per_file: 10_000
   dataset_kwargs_test:
-    max_n_files_per_type: 1
+    max_n_files_per_type: 2
     shuffle_only_once: true
     load_only_once: false
     n_files_at_once: 3
@@ -187,7 +187,7 @@ data:
       particle_features: ${feature_dict}
 
 trainer:
-  max_steps: 1_000_000
+  max_steps: 1_500_000
   gradient_clip_val: 1
   log_every_n_steps: 20
   devices: 4
