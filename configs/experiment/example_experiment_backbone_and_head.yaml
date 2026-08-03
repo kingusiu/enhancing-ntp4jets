@@ -146,7 +146,7 @@ data:
     shuffle_data: true
     load_only_once: false
     shuffle_only_once: false
-    n_files_at_once: 5
+    n_files_at_once: 10
     n_jets_per_file: 100_000
   dataset_kwargs_val:
     seed: 1
