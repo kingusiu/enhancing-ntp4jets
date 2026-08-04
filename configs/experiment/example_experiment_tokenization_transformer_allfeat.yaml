@@ -23,7 +23,7 @@ tags: ["vqvae_tokenization_allfeat"]
 
 run_note: ""
 
-seed: null
+seed: 98765
 
 data:
   data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia
@@ -32,7 +32,7 @@ data:
     val: 2000
     test: 2000
   dataset_kwargs_train:
-    n_files_at_once: 5
+    n_files_at_once: 10
     load_only_once: false
     n_jets_per_file: 100_000
   dataset_kwargs_val:
