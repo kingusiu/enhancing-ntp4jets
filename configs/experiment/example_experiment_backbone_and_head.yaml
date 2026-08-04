@@ -129,11 +129,7 @@ model:
 
 callbacks:
   early_stopping:
-<<<<<<< HEAD
-    patience: 30 # number of checks with no improvement after which training will be stopped
-=======
     patience: 15 # set high for pre-trainings to avoid early stopping too early, but for fine-tuning you can set it lower
->>>>>>> origin/main
   model_checkpoint:
     save_top_k: 7 # save k best models (determined by above metric)
   classification_callback:
@@ -141,17 +137,10 @@ callbacks:
 
 data:
   batch_size:
-<<<<<<< HEAD
-    train: 250
-    val: 500
-    test: 500
-  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized/2026-07-09_18-39-06_gpu024_WhitePaddle # 8k, kin-only
-=======
     train: 1000
     val: 1000
     test: 1000
-  data_dir: /data/dust/user/birkjosc/datasets/jetclass_tokenized/2025-08-29_17-45-25_g003_EnnoblingHip_923012_all_files_all_types # 8k, kin-only
->>>>>>> origin/main
+  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized/2026-07-09_18-39-06_gpu024_WhitePaddle # 8k, kin-only
   dataset_kwargs_train:
     max_n_files_per_type: 100
     shuffle_files: true
