@@ -23,7 +23,7 @@ tags: ["vqvae_tokenization"]
 
 run_note: ""
 
-seed: null
+seed: 98765
 
 data:
   data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia
@@ -121,6 +121,8 @@ model:
       affine_lr: 2
       sync_nu: 1
       replace_freq: 500
+      dim: -1
+      groups: 1
 
 task_name: "tokenization"
 
