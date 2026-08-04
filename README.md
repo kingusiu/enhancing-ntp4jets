@@ -64,7 +64,7 @@ You can run the training of the VQ-VAE model by running the following command:
 python gabbro/train.py experiment=example_experiment_tokenization_transformer
 ```
 
-To create the tokenized dataset, you can run the following command (with adjusted paths):
+To create the tokenized dataset, you can run the following command (with adjusted paths and jet types):
 
 ```shell
 python scripts/create_tokenized_jetclass_files.py \
@@ -109,6 +109,8 @@ following command:
 ```shell
 python gabbro/train.py \
     'experiment=[ example_experiment_backbone_and_head ]' \
+    'model.backbone_cfg.backbone_weights_path=/path/to/pretrained/checkpoint' \
+    'model.backbone_cfg.mask_fraction=0' \
     'model.loss_term_weights={mpm:0, gen:0, class:1}' \
     'model.causal_bidirectional_hybrid=false' \
     'model.backbone_cfg.apply_causal_mask=false'
