@@ -32,7 +32,7 @@ data:
     val: 2000
     test: 2000
   dataset_kwargs_train:
-    n_files_at_once: 10
+    n_files_at_once: 5
     load_only_once: false
     n_jets_per_file: 100_000
   dataset_kwargs_val:
@@ -113,7 +113,7 @@ model:
         gate_type: local
         init_value: 1.0
     vq_kwargs:
-      num_codes: 8192
+      num_codes: 32768
       beta: 0.9
       kmeans_init: false # if you want to use this, you have to use the v0.2.5 docker image!
       norm: null
