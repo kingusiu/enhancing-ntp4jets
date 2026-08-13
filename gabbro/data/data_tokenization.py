@@ -129,7 +129,9 @@ def tokenize_jetclass_file(
     config_path = ckpt_path.parent.parent / "config.yaml"
     cfg = OmegaConf.load(config_path)
     logger.info(f"Loaded config from {config_path}")
-    tokenizer = VQVAELightning.load_from_checkpoint(ckpt_path)
+    # map_location="cpu" avoids restoring to the exact cuda device index the
+    # checkpoint was saved from (e.g. cuda:3 from a multi-GPU DDP run)
+    tokenizer = VQVAELightning.load_from_checkpoint(ckpt_path, map_location="cpu")
     if print_model:
         print(tokenizer)
     pp_dict = OmegaConf.to_container(cfg.data.dataset_kwargs_common["feature_dict"])

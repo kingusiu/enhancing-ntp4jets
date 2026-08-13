@@ -15,7 +15,7 @@ tags: [omnijet-backbone-multihead-allfeat-mpm]
 
 run_note: ""
 
-seed: null
+seed: 12345
 # load_weights_from --> load the weights of the model from a checkpoint
 # load_weights_strict --> if true, the weights will be loaded strictly, i.e. the model architecture must match the checkpoint
 # continue_from_checkpoint --> continue training from a checkpoint (weights, optimizer, scheduler, etc.) - specify a path here!
@@ -52,14 +52,15 @@ model:
   backbone_lr_factor: null # null = all weights trained with same learning rate, otherwise backbone lr is multiplied with this factor
   model_kwargs_loaded: null
   pos_encoding_type: sort_by_first_feature_descending_in_masked_subset
-  causal_bidirectional_hybrid: true # if true: causal (& non-masked) forward pass for gen, bidirectional (& masked) forward pass for MPM
+  # only use `causal_bidirectional_hybrid: true` for joint pre-training. otherwise set to false.
+  causal_bidirectional_hybrid: false # if true: causal (& non-masked) forward pass for gen, bidirectional (& masked) forward pass for MPM
   masked_input_treatment: 'exclude'
   start_token_type: trainable # options are: 'trainable', 'zero_pad', `null`
   exclude_padded_values_from_loss: true
   loss_term_weights: # loss term weighting factors for different tasks
     mpm: 1.0
     class: 0.0 # --> class head won't even be initialized
-    gen: 1.0
+    gen: 0.0
   class_head_cfg: # this is the class head for the classification task
     n_out_nodes: 10
   gen_head_cfg:
@@ -79,10 +80,10 @@ model:
     token_dir: ${data.data_dir}
     mask_fraction: 0.4
     # --- stuff for the torch model ---
-    apply_causal_mask: true
+    apply_causal_mask: false
     embedding_dim: 128
     max_sequence_len: ${data.dataset_kwargs_common.pad_length}
-    vocab_size: 8194
+    vocab_size: 32770 #32768+2 # adjust to tokenizer codebook size plus 2!
     n_registers: 8
     particle_features_dict: ${data.dataset_kwargs_common.feature_dict} # to extract input dim
     jet_features_dict: ${data.dataset_kwargs_common.feature_dict_jet} # to extract input dim
@@ -139,15 +140,15 @@ data:
     train: 250
     val: 500
     test: 500
-  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized/2026-07-09_18-39-06_gpu024_WhitePaddle # 8k, kin-only
+  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized_allfeat/2026-08-04_14-03-40_gpu024_EquestrianSymbol # 8k, kin-only
   dataset_kwargs_train:
     max_n_files_per_type: 200
     shuffle_files: true
     shuffle_data: true
     load_only_once: false
     shuffle_only_once: false
-    n_files_at_once: 3
-    n_jets_per_file: 50_000
+    n_files_at_once: 10
+    n_jets_per_file: 100_000
   dataset_kwargs_val:
     seed: 1
     random_seed_for_per_file_shuffling: null
@@ -157,13 +158,13 @@ data:
     shuffle_only_once: true
     load_only_once: true
     n_files_at_once: 10
-    n_jets_per_file: 10_000
+    n_jets_per_file: 100_000
   dataset_kwargs_test:
     max_n_files_per_type: 2
     shuffle_only_once: true
     load_only_once: false
-    n_files_at_once: 3
-    n_jets_per_file: 50_000
+    n_files_at_once: 10
+    n_jets_per_file: 100_000
   dataset_kwargs_common:
     seed: ${seed}
     dataset_type: jetclass
