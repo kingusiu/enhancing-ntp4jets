@@ -137,11 +137,11 @@ callbacks:
 data:
   batch_size:
     train: 250
-    val: 500
-    test: 500
+    val: 250
+    test: 250
   data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized_allfeat/2026-08-04_14-03-40_gpu024_EquestrianSymbol
   dataset_kwargs_train:
-    max_n_files_per_type: 200
+    max_n_files_per_type: 100
     shuffle_files: true
     shuffle_data: true
     load_only_once: false
