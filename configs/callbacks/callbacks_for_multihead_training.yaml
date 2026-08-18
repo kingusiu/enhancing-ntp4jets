@@ -14,7 +14,8 @@ model_checkpoint:
   filename: "epoch_{epoch:03d}_step_{step}_loss_{val_loss:.5f}"
   monitor: "val_loss"
   mode: "min"
-  every_n_epochs: 1
+  every_n_epochs: 2
+  save_on_train_epoch_end: true
   save_last: True
   auto_insert_metric_name: False
 
@@ -28,7 +29,7 @@ model_checkpoint_best:
 
 early_stopping:
   monitor: "val_loss"
-  patience: 10
+  patience: 20
   mode: "min"
   verbose: true
 
