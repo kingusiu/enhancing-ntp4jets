@@ -36,6 +36,7 @@ var/
 wheels/
 slurm/
 trained/
+analysis/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
