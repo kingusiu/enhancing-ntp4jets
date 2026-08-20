@@ -200,6 +200,9 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
             experiment_key = logger_i.experiment.get_key()
             log.info(f"Comet experiment_key: {experiment_key}")
             cfg.logger.comet.experiment_key = experiment_key
+            # tag the run with its auto-generated name (e.g. "OverhandCorner") for easy filtering
+            if cfg.logger.comet.get("experiment_name"):
+                logger_i.experiment.add_tags([cfg.logger.comet.experiment_name])
 
     log.info("Instantiating callbacks...")
 
