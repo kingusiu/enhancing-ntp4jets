@@ -187,7 +187,8 @@ data:
       particle_features: ${feature_dict}
 
 trainer:
-  max_steps: 1_000_000
+  max_epochs: 100
+  max_steps: -1
   gradient_clip_val: 1
   log_every_n_steps: 20
   devices: 4
