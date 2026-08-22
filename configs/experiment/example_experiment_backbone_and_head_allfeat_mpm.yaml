@@ -26,7 +26,7 @@ continue_from_checkpoint: null
 token_head_cfg: &token_head_cfg
   n_pred: 1 # number of tokens to predict per position (i.e. if set to 1, this is the default next-token / masked token prediction)
   positions_to_include_in_loss: all # 'only_survived', 'only_masked'  'all' ('all' means that the model will predict all tokens, including the ones that were masked out)
-  apply_causal_mask: true
+  apply_causal_mask: false
   unembedding_mlp_cfg: null # set to null to just use a linear layer
   transformer_cfg:
     n_blocks: 2
@@ -140,7 +140,7 @@ data:
     train: 250
     val: 250
     test: 250
-  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized_allfeat/2026-08-04_14-03-40_gpu024_EquestrianSymbol # 8k, kin-only
+  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized_allfeat/2026-08-04_14-03-40_gpu024_EquestrianSymbol
   dataset_kwargs_train:
     max_n_files_per_type: 100
     shuffle_files: true
@@ -196,7 +196,9 @@ trainer:
   num_nodes: 1
   limit_train_batches: 1.0
   limit_val_batches: 1.0
-  #val_check_interval: 25000
+  val_check_interval: 25000
+  check_val_every_n_epoch: 1 # must be 1, otherwise validation (and the 25k-step interval) is skipped on odd epochs
+
 
 task_name: "omnijet_backbone"
 

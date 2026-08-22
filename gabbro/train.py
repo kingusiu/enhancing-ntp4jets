@@ -450,7 +450,7 @@ def main(cfg: DictConfig) -> Optional[float]:
             log.info(f"Setting continue_from_checkpoint={last_ckpt}")
             cfg.continue_from_checkpoint = str(last_ckpt)
 
-    experiment_name = Path(cfg.trainer.default_root_dir).name.split("_")[-2]
+    experiment_name = Path(cfg.trainer.default_root_dir).name.split("_")[-1]
     cfg.logger.comet.experiment_name = experiment_name
     cfg.logger.wandb.name = experiment_name
 

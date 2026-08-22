@@ -29,7 +29,7 @@ token_head_cfg: &token_head_cfg
   apply_causal_mask: true
   unembedding_mlp_cfg: null # set to null to just use a linear layer
   transformer_cfg:
-    n_blocks: 0 # should be set to 0!!
+    n_blocks: 0 # should be set to 0 for ntp (linear layer token head)!
     dim: 128
     norm_after_blocks: true
     attn_cfg:
@@ -77,7 +77,7 @@ model:
     # --- stuff caught by the lightning wrapper ---
     backbone_weights_path: null
     token_dir: ${data.data_dir}
-    mask_fraction: 0
+    mask_fraction: 0.0
     # --- stuff for the torch model ---
     apply_causal_mask: true
     embedding_dim: 128
@@ -157,12 +157,12 @@ data:
     shuffle_only_once: true
     load_only_once: true
     n_files_at_once: 10
-    n_jets_per_file: 50_000
+    n_jets_per_file: 100_000
   dataset_kwargs_test:
-    max_n_files_per_type: 1
+    max_n_files_per_type: 2
     shuffle_only_once: true
     load_only_once: false
-    n_files_at_once: 3
+    n_files_at_once: 10
     n_jets_per_file: 100_000
   dataset_kwargs_common:
     seed: ${seed}
@@ -195,7 +195,9 @@ trainer:
   num_nodes: 1
   limit_train_batches: 1.0
   limit_val_batches: 1.0
-  #val_check_interval: 25000
+  val_check_interval: 25000
+  check_val_every_n_epoch: 1 # must be 1, otherwise validation (and the 25k-step interval) is skipped on odd epochs
+
 
 task_name: "omnijet_backbone"
 
