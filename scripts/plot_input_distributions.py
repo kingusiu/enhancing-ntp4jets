@@ -8,6 +8,7 @@ across jet types) for each feature, saving the figures to disk.
 import argparse
 import glob
 import logging
+import math
 import os
 import random
 import sys
@@ -86,6 +87,11 @@ parser.add_argument(
     help="Optional jet type (must be in --jet_types) to draw as the filled background histogram.",
 )
 
+parser.add_argument(
+    "--stats_only",
+    action="store_true",
+    help="Only compute and display statistics, without generating plots.",
+)
 
 def main(
     jet_types: list,
@@ -94,6 +100,7 @@ def main(
     max_files_per_type: int = None,
     seed: int = 42,
     bg_name: str = None,
+    stats_only: bool = False,
 ):
     """Read tokenized particle features for a set of jet types and plot per-feature histograms.
 
@@ -135,26 +142,69 @@ def main(
     fields = arrays[jet_types[0]].fields
     log.info(f"Plotting the following fields: {fields}")
 
-    jet_types_suffix = "_".join(jet_types)
+    stats_lines = []
+    stats_lines.append("Input feature statistics summary")
+    stats_lines.append(f"jet_types: {', '.join(jet_types)}")
+    stats_lines.append(f"data_dir: {data_dir}")
+    stats_lines.append("")
 
     for field in fields:
-        log.info(f"Plotting feature '{field}'")
-        data = [ak.to_numpy(ak.flatten(arrays[jet_type][field], axis=None)) for jet_type in jet_types]
-        heplt.plot_feature_hist_for_n_samples(
-            data=data,
-            sample_names=jet_types,
-            xlabel=field,
-            bins=70,
-            plot_name=f"{field}__{jet_types_suffix}",
-            fig_dir=output_dir,
-            show_plt=False,
-            legend_outside=False,
-            bg_name=bg_name,
-            bg_alpha=0.3,
-            fig_size=(6.0,4.5)
-        )
+        stats_lines.append(f"Field: {field}")
+        for jet_type in jet_types:
+            values = ak.to_numpy(ak.flatten(arrays[jet_type][field], axis=None))
+            if values.size == 0:
+                mean_val = float("nan")
+                min_val = float("nan")
+                max_val = float("nan")
+                iqr_val = float("nan")
+            else:
+                mean_val = float(values.mean())
+                min_val = float(values.min())
+                max_val = float(values.max())
+                q1_val, q3_val = (float(v) for v in __import__("numpy").percentile(values, [25, 75]))
+                iqr_val = q3_val - q1_val
 
-    log.info(f"Saved plots to {output_dir}")
+            mean_str = f"{mean_val:.8g}" if not math.isnan(mean_val) else "nan"
+            min_str = f"{min_val:.8g}" if not math.isnan(min_val) else "nan"
+            max_str = f"{max_val:.8g}" if not math.isnan(max_val) else "nan"
+            iqr_str = f"{iqr_val:.8g}" if not math.isnan(iqr_val) else "nan"
+
+            line = (
+                f"  {jet_type}: mean={mean_str}, min={min_str}, max={max_str}, IQR={iqr_str}"
+            )
+            stats_lines.append(line)
+            log.info(f"{field} | {line.strip()}")
+        stats_lines.append("")
+
+    stats_path = os.path.join(output_dir, f"feature_stats__{'_'.join(jet_types)}.txt")
+    with open(stats_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(stats_lines).rstrip() + "\n")
+    log.info(f"Saved statistics summary to {stats_path}")
+
+    
+
+    jet_types_suffix = "_".join(jet_types)
+
+    if not stats_only:
+
+        for field in fields:
+            log.info(f"Plotting feature '{field}'")
+            data = [ak.to_numpy(ak.flatten(arrays[jet_type][field], axis=None)) for jet_type in jet_types]
+            heplt.plot_feature_hist_for_n_samples(
+                data=data,
+                sample_names=jet_types,
+                xlabel=field,
+                bins=70,
+                plot_name=f"{field}__{jet_types_suffix}",
+                fig_dir=output_dir,
+                show_plt=False,
+                legend_outside=False,
+                bg_name=bg_name,
+                bg_alpha=0.3,
+                fig_size=(6.0,4.5)
+            )
+
+        log.info(f"Saved plots to {output_dir}")
 
 
 if __name__ == "__main__":
@@ -166,5 +216,6 @@ if __name__ == "__main__":
         max_files_per_type=args.max_files_per_type,
         bg_name=args.bg_name,
         seed=args.seed,
+        stats_only=args.stats_only
     )
     log.info("------------ Finished plotting. ------------")
