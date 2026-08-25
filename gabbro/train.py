@@ -171,6 +171,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
         model = lightning_module_class.load_from_checkpoint(ckpt_path)
         # avoid overwriting the fine-tuned backbone weights restored from the checkpoint
         model._skip_backbone_weights_reload = True
+        model._backbone_weights_source = str(ckpt_path)
     else:
         ckpt_path = None
         log.info(f"Instantiating model <{cfg.model._target_}>")
