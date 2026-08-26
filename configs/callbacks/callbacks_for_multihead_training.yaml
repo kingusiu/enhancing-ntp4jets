@@ -14,7 +14,7 @@ model_checkpoint:
   filename: "epoch_{epoch:03d}_step_{step}_loss_{val_loss:.5f}"
   monitor: "val_loss"
   mode: "min"
-  every_n_epochs: 2
+  every_n_epochs: 1
   save_on_train_epoch_end: true
   save_last: True
   auto_insert_metric_name: False
