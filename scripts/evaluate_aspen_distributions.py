@@ -9,6 +9,7 @@ for each feature to disk.
 import argparse
 import glob
 import logging
+import math
 import os
 import random
 
@@ -76,6 +77,12 @@ parser.add_argument(
     type=str,
     default="analysis/aspen_jets",
     help="Directory to save the plots to.",
+)
+
+parser.add_argument(
+    "--stats_only",
+    action="store_true",
+    help="Only compute and display statistics, without generating plots.",
 )
 
 
@@ -149,7 +156,8 @@ def compute_features(constits_named, jets_named):
     return features
 
 
-def main(data_dir, file_pattern, output_dir, max_files=None, seed=42):
+
+def main(data_dir, file_pattern, output_dir, max_files=None, seed=42, stats_only=False):
     """Read all Aspen open-jets files, compute derived features and plot a histogram per feature.
 
     Parameters
@@ -189,26 +197,67 @@ def main(data_dir, file_pattern, output_dir, max_files=None, seed=42):
     log.info(f"Read {n_samples} samples for each feature")
 
     sample_name = "aspen_open_jets"
-    for field, arr in feature_arrays.items():
-        log.info(f"Plotting feature '{field}'")
-        flat = arr.flatten()
-        n_dropped = (~np.isfinite(flat)).sum()
-        if n_dropped:
-            log.info(f"Dropping {n_dropped} non-finite value(s) for '{field}'")
-            flat = flat[np.isfinite(flat)]
-        heplt.plot_feature_hist_for_n_samples(
-            data=[flat],
-            sample_names=[sample_name],
-            xlabel=field,
-            bins=70,
-            plot_name=f"{field}__{sample_name}",
-            fig_dir=output_dir,
-            show_plt=False,
-            legend_outside=False,
-            fig_size=(6.0, 4.5),
-        )
 
-    log.info(f"Saved plots to {output_dir}")
+    stats_lines = []
+    stats_lines.append("Input feature statistics summary")
+    stats_lines.append(f"data_dir: {data_dir}")
+    stats_lines.append("")
+
+    for field, arr in feature_arrays.items():
+        flat = arr.flatten()
+        finite = flat[np.isfinite(flat)]
+        if finite.size == 0:
+            mean_val = float("nan")
+            min_val = float("nan")
+            max_val = float("nan")
+            iqr_val = float("nan")
+        else:
+            mean_val = float(finite.mean())
+            min_val = float(finite.min())
+            max_val = float(finite.max())
+            q1_val, q3_val = (float(v) for v in np.percentile(finite, [25, 75]))
+            iqr_val = q3_val - q1_val
+
+        mean_str = f"{mean_val:.8g}" if not math.isnan(mean_val) else "nan"
+        min_str = f"{min_val:.8g}" if not math.isnan(min_val) else "nan"
+        max_str = f"{max_val:.8g}" if not math.isnan(max_val) else "nan"
+        iqr_str = f"{iqr_val:.8g}" if not math.isnan(iqr_val) else "nan"
+
+        line = f"  {sample_name}: mean={mean_str}, min={min_str}, max={max_str}, IQR={iqr_str}"
+
+        stats_lines.append(f"Field: {field}")
+        stats_lines.append(line)
+        log.info(f"{field} | {line.strip()}")
+        stats_lines.append("")
+
+    stats_path = os.path.join(output_dir, f"feature_stats__{sample_name}.txt")
+    with open(stats_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(stats_lines).rstrip() + "\n")
+    log.info(f"Saved statistics summary to {stats_path}")
+
+    if not stats_only:
+        log.info("Plotting feature histograms")
+
+        for field, arr in feature_arrays.items():
+            log.info(f"Plotting feature '{field}'")
+            flat = arr.flatten()
+            n_dropped = (~np.isfinite(flat)).sum()
+            if n_dropped:
+                log.info(f"Dropping {n_dropped} non-finite value(s) for '{field}'")
+                flat = flat[np.isfinite(flat)]
+            heplt.plot_feature_hist_for_n_samples(
+                data=[flat],
+                sample_names=[sample_name],
+                xlabel=field,
+                bins=70,
+                plot_name=f"{field}__{sample_name}",
+                fig_dir=output_dir,
+                show_plt=False,
+                legend_outside=False,
+                fig_size=(6.0, 4.5),
+            )
+
+        log.info(f"Saved plots to {output_dir}")
 
 
 if __name__ == "__main__":
@@ -219,5 +268,6 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         max_files=args.max_files,
         seed=args.seed,
+        stats_only=args.stats_only,
     )
     log.info("------------ Finished plotting. ------------")
