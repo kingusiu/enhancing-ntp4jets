@@ -104,7 +104,8 @@ def load_file(file_path):
         constits = h5_file["PFCands"][:]
         jets = h5_file["jet_kinematics"][:]
 
-    valid_mask = np.any(constits != 0, axis=-1)
+    pdg_id_idx = CONSTITS_FEATURE_NAMES.index("PDG_ID")
+    valid_mask = constits[..., pdg_id_idx] != 0
 
     dtype = np.dtype([(name, constits.dtype) for name in CONSTITS_FEATURE_NAMES])
     constits_named = np.empty(constits.shape[:-1], dtype=dtype)
