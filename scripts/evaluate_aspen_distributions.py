@@ -104,6 +104,8 @@ def load_file(file_path):
         constits = h5_file["PFCands"][:]
         jets = h5_file["jet_kinematics"][:]
 
+    valid_mask = np.any(constits != 0, axis=-1)
+
     dtype = np.dtype([(name, constits.dtype) for name in CONSTITS_FEATURE_NAMES])
     constits_named = np.empty(constits.shape[:-1], dtype=dtype)
     for i, name in enumerate(CONSTITS_FEATURE_NAMES):
@@ -114,11 +116,14 @@ def load_file(file_path):
     for i, name in enumerate(JET_FEATURE_NAMES):
         jets_named[name] = jets[..., i]
 
-    return constits_named, jets_named
+    return constits_named, jets_named, valid_mask
 
 
-def compute_features(constits_named, jets_named):
+def compute_features(constits_named, jets_named, valid_mask=None):
     """Compute the derived particle-level kinematics, following the playground notebook."""
+    if valid_mask is None:
+        valid_mask = np.ones(constits_named["px"].shape, dtype=bool)
+
     p = np.sqrt(
         constits_named["px"] ** 2 + constits_named["py"] ** 2 + constits_named["pz"] ** 2
     )
@@ -134,25 +139,34 @@ def compute_features(constits_named, jets_named):
     )
 
     features = {
-        "part_pt": np.sqrt(constits_named["px"] ** 2 + constits_named["py"] ** 2),
-        "part_p": p,
-        "part_eta": eta,
-        "part_phi": phi,
+        "part_pt": np.where(valid_mask, np.sqrt(constits_named["px"] ** 2 + constits_named["py"] ** 2), np.nan),
+        "part_p": np.where(valid_mask, p, np.nan),
+        "part_eta": np.where(valid_mask, eta, np.nan),
+        "part_phi": np.where(valid_mask, phi, np.nan),
         "part_etarel": np.where(
-            jets_named["pt"][:, None] > 0,
-            jets_named["eta"][:, None] - eta,
-            -(jets_named["eta"][:, None] - eta),
+            valid_mask,
+            np.where(
+                jets_named["pt"][:, None] > 0,
+                jets_named["eta"][:, None] - eta,
+                -(jets_named["eta"][:, None] - eta),
+            ),
+            np.nan,
         ),
-        "part_phirel": (jets_named["phi"][:, None] - phi + np.pi) % (2 * np.pi) - np.pi,
-        "part_mass": np.sqrt(np.clip(m2, 0, None)),
-        "part_charge": constits_named["charge"],
-        "part_d0val": constits_named["d0"],
-        "part_d0err": constits_named["d0Err"],
-        "part_dzval": constits_named["dz"],
-        "part_dzerr": constits_named["dzErr"],
-        "part_PUPPI_weight": constits_named["PUPPI_weight"],
+        "part_phirel": np.where(
+            valid_mask,
+            (jets_named["phi"][:, None] - phi + np.pi) % (2 * np.pi) - np.pi,
+            np.nan,
+        ),
+        "part_mass": np.where(valid_mask, np.sqrt(np.clip(m2, 0, None)), np.nan),
+        "part_charge": np.where(valid_mask, constits_named["charge"], np.nan),
+        "part_d0val": np.where(valid_mask, constits_named["d0"], np.nan),
+        "part_d0err": np.where(valid_mask, constits_named["d0Err"], np.nan),
+        "part_dzval": np.where(valid_mask, constits_named["dz"], np.nan),
+        "part_dzerr": np.where(valid_mask, constits_named["dzErr"], np.nan),
+        "part_PUPPI_weight": np.where(valid_mask, constits_named["PUPPI_weight"], np.nan),
     }
-    features.update(pid_flags(constits_named["PDG_ID"]))
+    flags = pid_flags(constits_named["PDG_ID"])
+    features.update({name: np.where(valid_mask, values, np.nan) for name, values in flags.items()})
     return features
 
 
@@ -187,8 +201,8 @@ def main(data_dir, file_pattern, output_dir, max_files=None, seed=42, stats_only
     feature_arrays = {}
     for file_path in file_paths:
         log.info(f"Reading {file_path}")
-        constits_named, jets_named = load_file(file_path)
-        for name, arr in compute_features(constits_named, jets_named).items():
+        constits_named, jets_named, valid_mask = load_file(file_path)
+        for name, arr in compute_features(constits_named, jets_named, valid_mask).items():
             feature_arrays.setdefault(name, []).append(arr)
 
     feature_arrays = {name: np.concatenate(arrs, axis=0) for name, arrs in feature_arrays.items()}
