@@ -86,7 +86,7 @@ def read_cms_open_data_file(
         # jet_tagging = f1["jet_tagging"][:]
 
     p4s_ak = np_to_ak(
-        x=PFCands[:, :, :4],
+        x=PFCands[:,:,-1], # last is puppi weight
         names=["px", "py", "pz", "E", "d0", "d0Err", "dz", "dzErr", "charge", "PDG_ID"],
         mask=PFCands[:, :, 3] != 0,
     )
@@ -99,6 +99,9 @@ def read_cms_open_data_file(
 
     p4_jet = ak.sum(p4, axis=1)
 
+    # PDG-ID -> one-hot PID flags: 211 chargedHadron, 130 neutralHadron, 22 photon, 11 electron, 13 muon
+    abs_pdgid = np.abs(p4s_ak.PDG_ID)
+
     x_ak_particles = ak.Array(
         {
             "part_pt": p4.pt,
@@ -108,6 +111,15 @@ def read_cms_open_data_file(
             "part_phirel": p4.deltaphi(p4_jet),
             "part_mass": p4.mass,
             "part_charge": p4s_ak.charge,
+            "part_isChargedHadron": ak.values_astype(abs_pdgid == 211, "float32"),
+            "part_isNeutralHadron": ak.values_astype(abs_pdgid == 130, "float32"),
+            "part_isPhoton": ak.values_astype(abs_pdgid == 22, "float32"),
+            "part_isElectron": ak.values_astype(abs_pdgid == 11, "float32"),
+            "part_isMuon": ak.values_astype(abs_pdgid == 13, "float32"),
+            "part_d0": p4s_ak.d0,
+            "part_d0Err": p4s_ak.d0Err,
+            "part_dz": p4s_ak.dz,
+            "part_dzErr": p4s_ak.dzErr,
         }
     )
 
