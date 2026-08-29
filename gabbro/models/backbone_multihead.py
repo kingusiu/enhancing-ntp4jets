@@ -866,7 +866,11 @@ class BackboneMultiHeadLightning(L.LightningModule):
     def on_train_start(self) -> None:
         """Lightning hook that is called when training begins."""
         self.pylogger.info("`on_train_start` called.")
-        if self.backbone_weights_path is not None:
+        if getattr(self, "_skip_backbone_weights_reload", False):
+            self.pylogger.info(
+                "Skipping backbone weights reload: model was restored from a checkpoint."
+            )
+        elif self.backbone_weights_path is not None:
             if self.backbone_weights_path != "None":
                 load_backbone_weights(self, self.backbone_weights_path, strict=True)
 

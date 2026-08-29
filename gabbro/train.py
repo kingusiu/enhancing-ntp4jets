@@ -169,6 +169,8 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
                 f"Available models are: {dir(gabbro_lightning_models)}"
             )
         model = lightning_module_class.load_from_checkpoint(ckpt_path)
+        # avoid overwriting the fine-tuned backbone weights restored from the checkpoint
+        model._skip_backbone_weights_reload = True
     else:
         ckpt_path = None
         log.info(f"Instantiating model <{cfg.model._target_}>")
