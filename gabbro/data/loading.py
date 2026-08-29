@@ -87,7 +87,7 @@ def read_cms_open_data_file(
 
     p4s_ak = np_to_ak(
         x=PFCands[:, :, :4],
-        names=["px", "py", "pz", "E"],
+        names=["px", "py", "pz", "E", "d0", "d0Err", "dz", "dzErr", "charge", "PDG_ID"],
         mask=PFCands[:, :, 3] != 0,
     )
 
@@ -106,6 +106,8 @@ def read_cms_open_data_file(
             "part_phi": p4.phi,
             "part_etarel": p4.deltaeta(p4_jet),
             "part_phirel": p4.deltaphi(p4_jet),
+            "part_mass": p4.mass,
+            "part_charge": p4s_ak.charge,
         }
     )
 

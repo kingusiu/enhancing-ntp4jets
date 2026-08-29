@@ -1,0 +1,35 @@
+_target_: gabbro.data.iterable_dataset_jetclass.IterableDatamodule
+
+defaults:
+  - defaults.yaml
+
+data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/aspenJets
+
+batch_size: 512
+
+dataset_kwargs_common:
+  dataset_type: aoj
+  pad_length: 128
+  labels_to_load:
+    - label_QCD
+
+# NOTE: only a single file (RunG_batch0.h5) currently exists for AOJ, so train/val/test
+# below all point at it. n_jets_per_file only takes the *first* N jets, so this does NOT
+# give you disjoint splits - you'll need to split the file (or add offset support) yourself
+# before using this for anything beyond quick checks.
+dataset_kwargs_train:
+  files_dict:
+    QCD:
+      - ${data.data_dir}/RunG_batch0.h5
+
+dataset_kwargs_val:
+  max_n_files_per_type: 1
+  files_dict:
+    QCD:
+      - ${data.data_dir}/RunG_batch0.h5
+
+dataset_kwargs_test:
+  max_n_files_per_type: 1
+  files_dict:
+    QCD:
+      - ${data.data_dir}/RunG_batch0.h5
