@@ -86,7 +86,7 @@ def read_cms_open_data_file(
         # jet_tagging = f1["jet_tagging"][:]
 
     p4s_ak = np_to_ak(
-        x=PFCands[:,:,-1], # last is puppi weight
+        x=PFCands,  # last column (index 10) is PUPPI weight, unused here
         names=["px", "py", "pz", "E", "d0", "d0Err", "dz", "dzErr", "charge", "PDG_ID"],
         mask=PFCands[:, :, 3] != 0,
     )
@@ -116,10 +116,10 @@ def read_cms_open_data_file(
             "part_isPhoton": ak.values_astype(abs_pdgid == 22, "float32"),
             "part_isElectron": ak.values_astype(abs_pdgid == 11, "float32"),
             "part_isMuon": ak.values_astype(abs_pdgid == 13, "float32"),
-            "part_d0": p4s_ak.d0,
-            "part_d0Err": p4s_ak.d0Err,
-            "part_dz": p4s_ak.dz,
-            "part_dzErr": p4s_ak.dzErr,
+            "part_d0val": p4s_ak.d0,
+            "part_d0err": p4s_ak.d0Err,
+            "part_dzval": p4s_ak.dz,
+            "part_dzerr": p4s_ak.dzErr,
         }
     )
 
