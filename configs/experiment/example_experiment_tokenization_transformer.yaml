@@ -23,14 +23,14 @@ tags: ["vqvae_tokenization"]
 
 run_note: ""
 
-seed: 98765
+seed: 76543
 
 data:
   data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia
   batch_size:
-    train: 500
-    val: 2000
-    test: 2000
+    train: 250
+    val: 250
+    test: 250
   dataset_kwargs_train:
     n_files_at_once: 10
     load_only_once: false

@@ -23,14 +23,14 @@ tags: ["vqvae_tokenization_allfeat"]
 
 run_note: ""
 
-seed: 98765
+seed: 91735
 
 data:
   data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia
   batch_size:
-    train: 500
-    val: 2000
-    test: 2000
+    train: 250
+    val: 250
+    test: 250
   dataset_kwargs_train:
     n_files_at_once: 10
     load_only_once: false
@@ -55,13 +55,16 @@ data:
     feature_dict_jet: null
 
 trainer:
-  max_steps: 1_000_000
+  max_steps: 2_000_000
   gradient_clip_val: 5
   log_every_n_steps: 5
   devices: 4
   num_nodes: 1
-  limit_train_batches: ${eval:'int(${data.dataset_kwargs_train.n_files_at_once} * ${data.dataset_kwargs_train.n_jets_per_file} / ${data.batch_size.train} / ${trainer.devices} / ${trainer.num_nodes})'}
-  limit_val_batches: ${eval:'int(${data.dataset_kwargs_val.n_files_at_once} * ${data.dataset_kwargs_val.n_jets_per_file} / ${data.batch_size.val} / ${trainer.devices} / ${trainer.num_nodes})'}
+  limit_train_batches: 1.0 #${eval:'int(${data.dataset_kwargs_train.n_files_at_once} * ${data.dataset_kwargs_train.n_jets_per_file} / ${data.batch_size.train} / ${trainer.devices} / ${trainer.num_nodes})'}
+  limit_val_batches: 1.0 #${eval:'int(${data.dataset_kwargs_val.n_files_at_once} * ${data.dataset_kwargs_val.n_jets_per_file} / ${data.batch_size.val} / ${trainer.devices} / ${trainer.num_nodes})'}
+  val_check_interval: 25000
+  check_val_every_n_epoch: 1 # must be 1, otherwise validation (and the 25k-step interval) is skipped on odd epochs
+
 
 model:
   model_kwargs_loaded: null

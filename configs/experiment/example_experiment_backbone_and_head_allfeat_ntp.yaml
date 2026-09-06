@@ -139,7 +139,7 @@ data:
     train: 250
     val: 250
     test: 250
-  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized_allfeat/2026-08-04_14-03-40_gpu024_EquestrianSymbol
+  data_dir: /home/users/w/wozniak/lumea_dats/JetClass/Pythia/cont_alfa_tokenized_allfeat/2026-09-02_13-47-51_gpu024_RecordedDelusion
   dataset_kwargs_train:
     max_n_files_per_type: 100
     shuffle_files: true

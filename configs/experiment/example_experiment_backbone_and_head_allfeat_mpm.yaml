@@ -15,7 +15,7 @@ tags: [omnijet-backbone-multihead-allfeat-mpm]
 
 run_note: ""
 
-seed: 12345
+seed: 91732
 # load_weights_from --> load the weights of the model from a checkpoint
 # load_weights_strict --> if true, the weights will be loaded strictly, i.e. the model architecture must match the checkpoint
 # continue_from_checkpoint --> continue training from a checkpoint (weights, optimizer, scheduler, etc.) - specify a path here!
@@ -140,7 +140,7 @@ data:
     train: 250
     val: 250
     test: 250
-  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized_allfeat/2026-08-04_14-03-40_gpu024_EquestrianSymbol
+  data_dir: /home/users/w/wozniak/lumea_dats/JetClass/Pythia/cont_alfa_tokenized_allfeat/2026-09-02_14-03-31_gpu044_PeculiarAssassin
   dataset_kwargs_train:
     max_n_files_per_type: 100
     shuffle_files: true

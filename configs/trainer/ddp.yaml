@@ -3,7 +3,11 @@ defaults:
 
 # use "ddp_find_unused_parameters_true" in scenarios with unused parameters
 #strategy: ddp_find_unused_parameters_true
-strategy: ddp
+strategy:
+  _target_: lightning.pytorch.strategies.DDPStrategy
+  timeout:
+    _target_: datetime.timedelta
+    minutes: 60 # abort stuck NCCL collectives after this long (needs TORCH_NCCL_ASYNC_ERROR_HANDLING=1 to be enforced)
 accelerator: gpu
 devices: 4 # GPUs per node — match --gpus-per-node in slurm sh script
 num_nodes: 1
