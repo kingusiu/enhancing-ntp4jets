@@ -10,3 +10,9 @@ comet:
   experiment_key: null # set to resume experiment
   offline: False
   prefix: ""
+  # extra kwargs below are forwarded to the comet_ml.Experiment constructor.
+  # network/disk system metrics are logged automatically at a fast, fixed rate and were
+  # a major contributor to the "system_metrics" rate limiting -- they're rarely useful
+  # for training runs, so disable them and keep only cpu/gpu utilization.
+  log_env_network: False
+  log_env_disk: False

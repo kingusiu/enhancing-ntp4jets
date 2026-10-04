@@ -67,7 +67,7 @@ model:
     # this is the generation head for the next token prediction task
     # if set to None, no generation head will be used
     !!merge <<: *token_head_cfg
-    apply_causal_mask: true
+    apply_causal_mask: false
     positions_to_include_in_loss: all
   mpm_head_cfg:
     !!merge <<: *token_head_cfg
@@ -131,7 +131,7 @@ callbacks:
   early_stopping:
     patience: 50 # number of checks with no improvement after which training will be stopped
   model_checkpoint:
-    save_top_k: 7 # save k best models (determined by above metric)
+    save_top_k: -1 # -1 = save all checkpoints, no cap
   classification_callback:
     log_images: false
 

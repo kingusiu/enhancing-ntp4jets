@@ -15,7 +15,7 @@ tags: [omnijet-backbone-multihead-allfeat-ntp-classifier-head]
 
 run_note: ""
 
-seed: 12345
+seed: 92734
 # load_weights_from --> load the weights of the model from a checkpoint
 # load_weights_strict --> if true, the weights will be loaded strictly, i.e. the model architecture must match the checkpoint
 # continue_from_checkpoint --> continue training from a checkpoint (weights, optimizer, scheduler, etc.) - specify a path here!
@@ -130,7 +130,7 @@ callbacks:
   early_stopping:
     patience: 50 # number of checks with no improvement after which training will be stopped
   model_checkpoint:
-    save_top_k: 7 # save k best models (determined by above metric)
+    save_top_k: -1 # -1 = save all checkpoints, no cap
   classification_callback:
     log_images: false
 
@@ -139,7 +139,7 @@ data:
     train: 250
     val: 250
     test: 250
-  data_dir: /srv/beegfs/scratch/groups/rodem/lumea/datasets/JetClass/Pythia/cont_alfa_tokenized_allfeat/2026-08-04_14-03-40_gpu024_EquestrianSymbol
+  data_dir: /home/users/w/wozniak/lumea_dats/JetClass/Pythia/cont_alfa_tokenized_allfeat/2026-09-02_13-47-51_gpu024_RecordedDelusion
   dataset_kwargs_train:
     max_n_files_per_type: 100
     shuffle_files: true
@@ -198,7 +198,7 @@ trainer:
   val_check_interval: 25000
   check_val_every_n_epoch: 1 # must be 1, otherwise validation (and the 25k-step interval) is skipped on odd epochs
 
-task_name: "omnijet_backbone"
+task_name: "omnijet_npt_head"
 
 logger:
   wandb:

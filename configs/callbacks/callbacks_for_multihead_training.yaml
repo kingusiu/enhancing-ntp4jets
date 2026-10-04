@@ -14,7 +14,9 @@ model_checkpoint:
   filename: "epoch_{epoch:03d}_step_{step}_loss_{val_loss:.5f}"
   monitor: "val_loss"
   mode: "min"
-  every_n_epochs: 1
+  save_top_k: -1 # -1 = save all checkpoints, no cap
+  every_n_train_steps: 25000 # mutually exclusive with every_n_epochs
+  every_n_epochs: null # mutually exclusive with every_n_train_steps
   save_on_train_epoch_end: true
   save_last: True
   auto_insert_metric_name: False
@@ -32,6 +34,18 @@ early_stopping:
   patience: 20
   mode: "min"
   verbose: true
+
+# the per-submodule (depth: -1) variants log one metric per leaf module (grad *and*
+# weight norms) on *every* training step, which is what was flooding Comet and
+# triggering the rate limiting / metric data loss. Disable them and only keep the
+# lightweight "_global" variants (one metric per top-level module), logged
+# infrequently.
+gradient_monitoring: null
+weight_monitoring: null
+gradient_monitoring_global:
+  logging_interval: 1000
+weight_monitoring_global:
+  logging_interval: 1000
 
 model_summary:
   max_depth: -1
