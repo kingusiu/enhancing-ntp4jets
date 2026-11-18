@@ -1,5 +1,6 @@
 
 import sys
+import gc
 import json
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from omegaconf import OmegaConf
 
 from gabbro.models.backbone_multihead import BackboneMultiHeadLightning
 import gabbro.metrics.cknna as cknna
+import gabbro.metrics.cknna_with_normalized as cknna_norm
 from gabbro.utils.pylogger import get_pylogger
 
 logger = get_pylogger(__name__)
@@ -64,7 +66,7 @@ def get_aoj_dataloader(cfg, file_path, n_jets_per_file=None):
 
     print(OmegaConf.to_yaml(cfg.data.dataset_kwargs_common.feature_dict, resolve=True))
 
-    datamodule_aoj = hydra.utils.instantiate(cfg_aoj.data)
+    datamodule_aoj = hydra.utils.instantiate(cfg.data)
     # AOJ has no separate train/val/test split - just read the file(s) directly
     datamodule_aoj.setup(stage="fit")
 
@@ -96,6 +98,14 @@ PRETRAIN_INIT_NAMES = (
 )
 PRETRAIN_INIT_EPOCH = 13
 N_RANDOM_SEEDS = 5
+
+# trained runs compared here (also used by compute_constituent_mmd_kernel.py)
+NTP_PRETRAIN_RUN = "/home/users/w/wozniak/dev/enhancing-ntp4jets/trained/omnijet-backbone-multihead-allfeat-ntp/runs/2026-09-09_10-23-31_gpu017_NonstandardAitchbone"
+MPM_PRETRAIN_RUN = "/home/users/w/wozniak/dev/enhancing-ntp4jets/trained/omnijet-backbone-multihead-allfeat-mpm/runs/2026-09-09_10-23-23_gpu017_OrganicMolluscum"
+NTP_FINETUNE_RUN = "/home/users/w/wozniak/dev/enhancing-ntp4jets/trained/omnijet-backbone-multihead-allfeat-ntp-classifier-head/runs/2026-09-14_17-32-09_gpu047_NeonatalSulfur"
+MPM_FINETUNE_RUN = "/home/users/w/wozniak/dev/enhancing-ntp4jets/trained/omnijet-backbone-multihead-allfeat-mpm-classifier-head/runs/2026-09-14_17-32-09_gpu024_TaxableSpecialism"
+# pool the start token's output into the per-jet embedding (see do_inference_on_aoj)
+INCLUDE_START_TOKEN = False
 
 
 def epoch_label_from_ckpt_path(path):
@@ -214,21 +224,24 @@ def load_model_checkpoints(model_path, max_epoch=None, init_ckpt=None, init_firs
     checkpoint_paths = pick_checkpoints_from_model_dir(
         model_path, max_epoch=max_epoch, init_ckpt=init_ckpt, init_first=init_first
     )
-    # bare state dicts have no hyper-parameters, so build their model from the first real
-    # checkpoint and overwrite the weights
     reference_ckpt = first_real_ckpt(checkpoint_paths)
-    models = []
-    for ckpt_path in checkpoint_paths:
-        if ckpt_path.name in BARE_STATE_DICT_NAMES:
-            model = BackboneMultiHeadLightning.load_from_checkpoint(reference_ckpt, strict=False)
-            missing, unexpected = model.load_state_dict(torch.load(ckpt_path, map_location="cpu"), strict=False)
-            print(f"{ckpt_path.name}: {len(missing)} missing, {len(unexpected)} unexpected keys")
-        else:
-            model = BackboneMultiHeadLightning.load_from_checkpoint(ckpt_path, strict=False)
-        model.eval()
-        model.to(device)
-        models.append(model)
+    models = [load_model(ckpt_path, reference_ckpt) for ckpt_path in checkpoint_paths]
     return models, checkpoint_paths
+
+
+def load_model(ckpt_path, reference_ckpt):
+    """One checkpoint as an eval-mode model on `device`.
+
+    Bare state dicts have no hyper-parameters, so their model is built from `reference_ckpt`
+    (a Lightning checkpoint of the same run) and the weights are overwritten.
+    """
+    if ckpt_path.name in BARE_STATE_DICT_NAMES:
+        model = BackboneMultiHeadLightning.load_from_checkpoint(reference_ckpt, strict=False)
+        missing, unexpected = model.load_state_dict(torch.load(ckpt_path, map_location="cpu"), strict=False)
+        print(f"{ckpt_path.name}: {len(missing)} missing, {len(unexpected)} unexpected keys")
+    else:
+        model = BackboneMultiHeadLightning.load_from_checkpoint(ckpt_path, strict=False)
+    return model.eval().to(device)
 
 
 def first_real_ckpt(checkpoint_paths):
@@ -236,21 +249,80 @@ def first_real_ckpt(checkpoint_paths):
     return next(p for p in checkpoint_paths if p.name not in BARE_STATE_DICT_NAMES)
 
 
-def random_init_embeddings(reference_ckpt, seed, dataloader, max_batches):
-    """Pooled embeddings of a freshly initialised model with the architecture of `reference_ckpt`."""
+def random_init_model(reference_ckpt, seed, causal=None):
+    """A freshly initialised model with the architecture of `reference_ckpt`.
+
+    `causal`, if given, overrides the backbone's causal attention mask.
+    """
     hparams = torch.load(reference_ckpt, map_location="cpu", weights_only=False)["hyper_parameters"]
     torch.manual_seed(seed)
     model = BackboneMultiHeadLightning(**hparams).eval().to(device)
+    if causal is not None:
+        model.backbone.apply_causal_mask = causal
+    return model
+
+
+def random_init_embeddings(reference_ckpt, seed, dataloader, max_batches, causal=None):
+    """Pooled embeddings of a freshly initialised model with the architecture of `reference_ckpt`."""
+    model = random_init_model(reference_ckpt, seed, causal=causal)
     return do_inference_on_aoj(dataloader, model, max_batches=max_batches)
 
 
+def inference_without_causal_mask(dataloader, model, max_batches):
+    """Pooled embeddings of `model` with its causal attention mask switched off for this pass."""
+    causal = model.backbone.apply_causal_mask
+    model.backbone.apply_causal_mask = False
+    try:
+        return do_inference_on_aoj(dataloader, model, max_batches=max_batches)
+    finally:
+        model.backbone.apply_causal_mask = causal
 
-def do_inference_on_aoj(dataloader, model, max_batches=None):
+
+def jet_multiplicity(dataloader, max_batches):
+    """Number of valid particles per jet, in the same order as do_inference_on_aoj's rows."""
+    mult = []
+    for batch in dataloader:
+        if max_batches is not None and len(mult) >= max_batches:
+            break
+        mult.append(batch["part_mask"].sum(dim=1).double())
+    return torch.cat(mult)
+
+
+def pooled_input_features(dataloader, max_batches, max_len):
+    """Mean-pooled raw `part_features` per jet, same rows and particles as do_inference_on_aoj's output.
+
+    `max_len` is the number of particles the backbone sees (max_sequence_len minus the start token).
+    """
+    pooled = []
+    for batch in dataloader:
+        if max_batches is not None and len(pooled) >= max_batches:
+            break
+        x, m = batch["part_features"][:, :max_len], batch["part_mask"][:, :max_len]
+        pooled.append(cknna.pool_jets(x.double(), m))
+    return torch.cat(pooled)
+
+
+METRICS = {
+    # raw features, feature-centred, kNN by inner product
+    "unnormalized": cknna.sweep_topk,
+    # authors' preprocessing: clamp at the 95th percentile of |value|, L2-normalise, no centring
+    "normalized": cknna_norm.sweep_topk_normalized,
+}
+
+
+
+def do_inference_on_aoj(dataloader, model, max_batches=None, include_start_token=None):
     """Run inference on the AOJ dataloader and return per-jet embeddings of shape (n_jets, D).
 
-    Each batch is mean-pooled over its valid (non-padded) particles, including the prepended
-    start token, right away, so the full per-particle outputs are never kept in memory.
+    Each batch is mean-pooled over its valid (non-padded) particles right away, so the full
+    per-particle outputs are never kept in memory. The prepended start token is fed to the
+    backbone but left out of the pooling unless `include_start_token` (default:
+    INCLUDE_START_TOKEN): its output is the same vector for every jet in a causal model, so
+    pooling it in adds a term that depends only on the jet's multiplicity.
     """
+    if include_start_token is None:
+        include_start_token = INCLUDE_START_TOKEN
+    n_prefix = 0
     pooled = []
     with torch.no_grad():
         for batch in dataloader:
@@ -268,19 +340,20 @@ def do_inference_on_aoj(dataloader, model, max_batches=None):
                 part_features = torch.cat([start_token, part_features], dim=1)
                 start_mask = torch.ones(batch_size, 1, dtype=part_mask.dtype, device=device)
                 part_mask = torch.cat([start_mask, part_mask], dim=1)
+                n_prefix = 0 if include_start_token else 1
 
             latent = model.backbone(part_features, mask=part_mask)
-            pooled.append(cknna.pool_jets(latent, part_mask).cpu())
+            pooled.append(cknna.pool_jets(latent[:, n_prefix:], part_mask[:, n_prefix:]).cpu())
     return torch.cat(pooled, dim=0)
 
 
-def compute_cknna_between_models(U, V, topks=(5, 10, 25, 50), n_sub=1500, n_draws=5):
+def compute_cknna_between_models(U, V, topks=(5, 10, 25, 50), n_sub=1500, n_draws=5, metric="unnormalized"):
     """Compute per-jet CKNNA (with permutation-null baseline) between two models' pooled embeddings.
 
-    Returns the list of per-topk result dicts from `cknna.sweep_topk`.
+    Returns the list of per-topk result dicts from the sweep function of `metric` (see METRICS).
     """
-    rows = cknna.sweep_topk(U, V, topks=topks, n_sub=n_sub, n_draws=n_draws)
-    print("\n--- alignment ---")
+    rows = METRICS[metric](U, V, topks=topks, n_sub=n_sub, n_draws=n_draws)
+    print(f"\n--- alignment ({metric}) ---")
     for row in rows:
         print(f"topk={row['topk']:>4}  CKNNA={row['cknna']:.4f}+-{row['cknna_std']:.4f}   "
                 f"null={row['null']:.4f}+-{row['null_std']:.4f}   z={row['z']:.1f}")
@@ -396,7 +469,11 @@ if __name__ == "__main__":
         
     AOJ_FILE = "/srv/beegfs/scratch/groups/rodem/lumea/datasets/aspenJets/RunG_batch0.h5"
 
-    max_batches = 50
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--max-batches", type=int, default=20, help="AOJ batches per checkpoint")
+    max_batches = ap.parse_args().max_batches
     batch_size_train = cfg_aoj.data.batch_size.train
     # +1 batch of margin, since the last batch from a capped file can come up short
     n_jets_per_file = (max_batches + 1) * batch_size_train if max_batches is not None else None
@@ -413,7 +490,7 @@ if __name__ == "__main__":
     ### pretrain
 
     # fine-tuning started from the epoch-13 snapshot, so the pretraining curve ends there
-    ntp_model_path = "/home/users/w/wozniak/dev/enhancing-ntp4jets/trained/omnijet-backbone-multihead-allfeat-ntp/runs/2026-09-09_10-23-31_gpu017_NonstandardAitchbone"
+    ntp_model_path = NTP_PRETRAIN_RUN
     ntp_models, ntp_ckpt_paths = load_model_checkpoints(
         ntp_model_path, max_epoch=PRETRAIN_INIT_EPOCH,
         init_ckpt=Path(ntp_model_path) / "checkpoints" / PRETRAIN_INIT_NAMES[0],
@@ -421,7 +498,7 @@ if __name__ == "__main__":
 
     print(f"Loaded {len(ntp_models)} NTP model checkpoints from {ntp_model_path}")
 
-    mpm_model_path = "/home/users/w/wozniak/dev/enhancing-ntp4jets/trained/omnijet-backbone-multihead-allfeat-mpm/runs/2026-09-09_10-23-23_gpu017_OrganicMolluscum"
+    mpm_model_path = MPM_PRETRAIN_RUN
     mpm_models, mpm_ckpt_paths = load_model_checkpoints(
         mpm_model_path, max_epoch=PRETRAIN_INIT_EPOCH,
         init_ckpt=Path(mpm_model_path) / "checkpoints" / PRETRAIN_INIT_NAMES[1],
@@ -431,7 +508,7 @@ if __name__ == "__main__":
 
     ### finetune
 
-    ntp_finetuned_model_path = "/home/users/w/wozniak/dev/enhancing-ntp4jets/trained/omnijet-backbone-multihead-allfeat-ntp-classifier-head/runs/2026-09-14_17-32-09_gpu047_NeonatalSulfur"
+    ntp_finetuned_model_path = NTP_FINETUNE_RUN
     # the finetuned NTP run trained 24 epochs, the finetuned MPM run 16 - cut NTP to epochs 0-15 to compare equally
     ntp_finetuned_models, ntp_finetuned_ckpt_paths = load_model_checkpoints(
         ntp_finetuned_model_path, max_epoch=15, init_ckpt=Path(ntp_finetuned_model_path) / INIT_CKPT_NAME, init_first=True
@@ -439,7 +516,7 @@ if __name__ == "__main__":
 
     print(f"Loaded {len(ntp_finetuned_models)} finetuned NTP model checkpoints from {ntp_finetuned_model_path}")
 
-    mpm_finetuned_model_path = "/home/users/w/wozniak/dev/enhancing-ntp4jets/trained/omnijet-backbone-multihead-allfeat-mpm-classifier-head/runs/2026-09-14_17-32-09_gpu024_TaxableSpecialism"
+    mpm_finetuned_model_path = MPM_FINETUNE_RUN
     mpm_finetuned_models, mpm_finetuned_ckpt_paths = load_model_checkpoints(
         mpm_finetuned_model_path, max_epoch=15, init_ckpt=Path(mpm_finetuned_model_path) / INIT_CKPT_NAME, init_first=True
     )
@@ -462,6 +539,11 @@ if __name__ == "__main__":
 
     print('NTP pre-trained inference complete.')
 
+    # the same pre-trained NTP checkpoints run bidirectionally, as MPM and both fine-tuned models
+    # are: separates what NTP learned from the effect of the causal attention structure
+    ntp_bidir_latents = [inference_without_causal_mask(dataloader_aoj, model, max_batches) for model in ntp_models]
+    print('NTP pre-trained inference without causal mask complete.')
+
     mpm_latents = [do_inference_on_aoj(dataloader_aoj, model, max_batches=max_batches) for model in mpm_models]
     print('MPM pre-trained inference complete.')
 
@@ -475,15 +557,51 @@ if __name__ == "__main__":
     ]
     print('MPM finetuned inference complete.')
 
-    # the fine-tuning start must reproduce the pretraining snapshot it loaded, bit for bit
-    for name, pre_latents, pre_epochs, ft_latents, ft_epochs in [
-        ("ntp", ntp_latents, ntp_epochs, ntp_finetuned_latents, ntp_finetuned_epochs),
-        ("mpm", mpm_latents, mpm_epochs, mpm_finetuned_latents, mpm_finetuned_epochs),
+    # a few AOJ jets have a non-finite input value (e.g. part_dzerr), which turns the whole pooled
+    # embedding non-finite; drop the same jets for every model so rows stay paired
+    keep = torch.ones(len(ntp_latents[0]), dtype=torch.bool)
+    for latents in (ntp_latents, ntp_bidir_latents, mpm_latents, ntp_finetuned_latents, mpm_finetuned_latents):
+        for U in latents:
+            keep &= torch.isfinite(U).all(dim=1)
+    print(f"dropping {int((~keep).sum())} of {len(keep)} jets with non-finite embeddings")
+    ntp_latents = [U[keep] for U in ntp_latents]
+    ntp_bidir_latents = [U[keep] for U in ntp_bidir_latents]
+    mpm_latents = [U[keep] for U in mpm_latents]
+    ntp_finetuned_latents = [U[keep] for U in ntp_finetuned_latents]
+    mpm_finetuned_latents = [U[keep] for U in mpm_finetuned_latents]
+
+    # the fine-tuning start must reproduce the pretraining snapshot it loaded, once the snapshot is
+    # run with the fine-tuning model's attention setting (the NTP fine-tuning config turns causal
+    # attention off, so the NTP curves legitimately jump at the start of fine-tuning)
+    for name, pre_models, pre_epochs, ft_models, ft_latents, ft_epochs in [
+        ("ntp", ntp_models, ntp_epochs, ntp_finetuned_models, ntp_finetuned_latents, ntp_finetuned_epochs),
+        ("mpm", mpm_models, mpm_epochs, mpm_finetuned_models, mpm_finetuned_latents, mpm_finetuned_epochs),
     ]:
-        diff = (pre_latents[pre_epochs.index("ft_src")] - ft_latents[ft_epochs.index("init")]).abs().max()
+        src_model = pre_models[pre_epochs.index("ft_src")]
+        init_idx = ft_epochs.index("init")
+        causal_pre = src_model.backbone.apply_causal_mask
+        causal_ft = ft_models[init_idx].backbone.apply_causal_mask
+        print(f"[check] {name}: causal attention pretraining={causal_pre}, fine-tuning={causal_ft}")
+        src_model.backbone.apply_causal_mask = causal_ft
+        U = do_inference_on_aoj(dataloader_aoj, src_model, max_batches=max_batches)[keep]
+        src_model.backbone.apply_causal_mask = causal_pre
+        diff = (U - ft_latents[init_idx]).abs().max()
         print(f"[check] {name}: max |embedding(pretraining snapshot) - embedding(fine-tuning init)| = {diff:.2e}")
-        if diff > 1e-3:
+        if not diff <= 1e-3:  # also true for nan
             print(f"[check] WARNING: {name} fine-tuning did not start from the pretraining snapshot")
+
+    # the model's own input, pooled the same way: tests whether the (random) embeddings are
+    # little more than a projection of the mean particle features
+    ref_model = ntp_models[0]
+    max_len = ref_model.hparams.backbone_cfg.max_sequence_len - 1 \
+        if ref_model.hparams.start_token_type in ["trainable", "zero_pad"] else None
+    input_feat = pooled_input_features(dataloader_aoj, max_batches, max_len)[keep]
+    del ref_model
+
+    # only the pooled embeddings are needed from here on
+    del ntp_models, mpm_models, ntp_finetuned_models, mpm_finetuned_models, src_model
+    gc.collect()
+    torch.cuda.empty_cache()
 
 
     ###################### alignment #######################
@@ -494,13 +612,15 @@ if __name__ == "__main__":
     # (the number of epochs can differ between models, so pairing by index would mismatch them)
     model_pairs = [
         ("ntp_vs_mpm", ntp_latents, mpm_latents, ntp_epochs, mpm_epochs),
+        ("ntp_bidir_vs_mpm", ntp_bidir_latents, mpm_latents, ntp_epochs, mpm_epochs),
         ("ntp_finetuned_vs_mpm_finetuned", ntp_finetuned_latents, mpm_finetuned_latents,
          ntp_finetuned_epochs, mpm_finetuned_epochs),
     ]
 
     print('computing CKNNA between model pairs and baselines...')
 
-    results = []
+    # one list of records per metric; the self-comparison baselines below are unnormalized only
+    results = {metric: [] for metric in METRICS}
     for pair_name, latents_a, latents_b, epochs_a, epochs_b in model_pairs:
         idx_b = {epoch: j for j, epoch in enumerate(epochs_b)}
         for i, epoch in enumerate(epochs_a):
@@ -508,9 +628,50 @@ if __name__ == "__main__":
                 continue
             j = idx_b[epoch]
             print(f"\n=== {pair_name} | epoch {epoch} ===")
-            rows = compute_cknna_between_models(latents_a[i], latents_b[j])
-            for row in rows:
-                results.append({"pair": pair_name, "checkpoint_idx": i, "epoch": epoch, **row})
+            for metric in METRICS:
+                rows = compute_cknna_between_models(latents_a[i], latents_b[j], metric=metric)
+                for row in rows:
+                    results[metric].append({"pair": pair_name, "checkpoint_idx": i, "epoch": epoch, **row})
+
+    ####### multiplicity reference: how much of each model's neighbourhoods is particle count alone
+
+    # 1-d feature log(N); the tiny jitter breaks the ties between jets of equal multiplicity,
+    # which would otherwise make the kNN graph of the reference arbitrary
+    mult = jet_multiplicity(dataloader_aoj, max_batches)[keep]
+    g = torch.Generator().manual_seed(0)
+    mult_feat = (mult.log() + 1e-3 * torch.randn(len(mult), generator=g, dtype=torch.float64))[:, None]
+    for group_name, latents, epochs in [
+        ("ntp", ntp_latents, ntp_epochs),
+        ("ntp_bidir", ntp_bidir_latents, ntp_epochs),
+        ("mpm", mpm_latents, mpm_epochs),
+        ("ntp_finetuned", ntp_finetuned_latents, ntp_finetuned_epochs),
+        ("mpm_finetuned", mpm_finetuned_latents, mpm_finetuned_epochs),
+    ]:
+        for i, latent in enumerate(latents):
+            print(f"\n=== {group_name}_vs_multiplicity | epoch {epochs[i]} ===")
+            norm_corr = float(torch.corrcoef(torch.stack([
+                (latent - latent.mean(0)).norm(dim=1).double(), mult]))[0, 1])
+            print(f"corr(|centred embedding|, multiplicity) = {norm_corr:.3f}")
+            # a 1-d feature cannot be L2-normalised meaningfully, so only the unnormalized metric
+            for row in compute_cknna_between_models(latent, mult_feat):
+                results["unnormalized"].append({"pair": f"{group_name}_vs_multiplicity", "checkpoint_idx": i,
+                                                "epoch": epochs[i], "norm_mult_corr": norm_corr, **row})
+
+    ####### input reference: how much of each model's neighbourhoods is the mean input features
+
+    for group_name, latents, epochs in [
+        ("ntp", ntp_latents, ntp_epochs),
+        ("ntp_bidir", ntp_bidir_latents, ntp_epochs),
+        ("mpm", mpm_latents, mpm_epochs),
+        ("ntp_finetuned", ntp_finetuned_latents, ntp_finetuned_epochs),
+        ("mpm_finetuned", mpm_finetuned_latents, mpm_finetuned_epochs),
+    ]:
+        for i, latent in enumerate(latents):
+            print(f"\n=== {group_name}_vs_input | epoch {epochs[i]} ===")
+            for metric in METRICS:
+                for row in compute_cknna_between_models(latent, input_feat, metric=metric):
+                    results[metric].append({"pair": f"{group_name}_vs_input", "checkpoint_idx": i,
+                                            "epoch": epochs[i], **row})
 
     ####### compute self-CKNNA identity / permutation baselines
 
@@ -525,30 +686,40 @@ if __name__ == "__main__":
         for i, latent in enumerate(latents):
             print(f"\n=== {group_name} | checkpoint {i} baselines ===")
             rows, rows_perm, identity = compute_identity_and_permutation_baselines(latent)
+            res = results["unnormalized"]
             for row in rows:
-                results.append({"pair": f"{group_name}_identity", "checkpoint_idx": i, "epoch": epochs[i], **row})
+                res.append({"pair": f"{group_name}_identity", "checkpoint_idx": i, "epoch": epochs[i], **row})
             for row in rows_perm:
-                results.append(
-                    {"pair": f"{group_name}_permutation", "checkpoint_idx": i, "epoch": epochs[i], **row}
-                )
-            results.append(
-                {"pair": f"{group_name}_identity_map", "checkpoint_idx": i, "epoch": epochs[i], **identity}
-            )
+                res.append({"pair": f"{group_name}_permutation", "checkpoint_idx": i, "epoch": epochs[i], **row})
+            res.append({"pair": f"{group_name}_identity_map", "checkpoint_idx": i, "epoch": epochs[i], **identity})
 
     ####### random-init baseline: CKNNA between independently initialised models, several seeds
 
+    # (name, checkpoints of a, of b, causal-mask override for a)
     random_pairs = [
-        ("ntp_vs_mpm_random_seeds", ntp_ckpt_paths, mpm_ckpt_paths),
-        ("ntp_finetuned_vs_mpm_finetuned_random_seeds", ntp_finetuned_ckpt_paths, mpm_finetuned_ckpt_paths),
+        ("ntp_vs_mpm_random_seeds", ntp_ckpt_paths, mpm_ckpt_paths, None),
+        ("ntp_bidir_vs_mpm_random_seeds", ntp_ckpt_paths, mpm_ckpt_paths, False),
+        ("ntp_finetuned_vs_mpm_finetuned_random_seeds", ntp_finetuned_ckpt_paths, mpm_finetuned_ckpt_paths, None),
     ]
-    for pair_name, paths_a, paths_b in random_pairs:
+    for pair_name, paths_a, paths_b, causal_a in random_pairs:
         ref_a, ref_b = first_real_ckpt(paths_a), first_real_ckpt(paths_b)
         for seed in range(N_RANDOM_SEEDS):
             print(f"\n=== {pair_name} | seed {seed} ===")
-            U = random_init_embeddings(ref_a, seed, dataloader_aoj, max_batches)
-            V = random_init_embeddings(ref_b, 1000 + seed, dataloader_aoj, max_batches)
-            for row in compute_cknna_between_models(U, V):
-                results.append({"pair": pair_name, "checkpoint_idx": seed, "epoch": f"seed{seed}", **row})
+            U = random_init_embeddings(ref_a, seed, dataloader_aoj, max_batches, causal=causal_a)[keep]
+            V = random_init_embeddings(ref_b, 1000 + seed, dataloader_aoj, max_batches)[keep]
+            for metric in METRICS:
+                for row in compute_cknna_between_models(U, V, metric=metric):
+                    results[metric].append({"pair": pair_name, "checkpoint_idx": seed, "epoch": f"seed{seed}", **row})
+                # every random pair, incl. the bidirectional one: is a random network ~ its input?
+                for name, X in (("a", U), ("b", V)):
+                    for row in compute_cknna_between_models(X, input_feat, metric=metric):
+                        results[metric].append({"pair": f"{pair_name}_{name}_vs_input",
+                                                "checkpoint_idx": seed, "epoch": f"seed{seed}", **row})
+            if causal_a is None:
+                for name, X in (("a", U), ("b", V)):
+                    for row in compute_cknna_between_models(X, mult_feat):
+                        results["unnormalized"].append({"pair": f"{pair_name}_{name}_vs_multiplicity",
+                                                        "checkpoint_idx": seed, "epoch": f"seed{seed}", **row})
 
 
     ###################### results #######################
@@ -557,14 +728,17 @@ if __name__ == "__main__":
 
     # save the values
     batches_label = f"{max_batches}batches" if max_batches is not None else "allbatches"
-    output_dir = Path("analysis/cknna") / f"{batches_label}_per-epoch"
+    start_token_label = "" if INCLUDE_START_TOKEN else "_no-start-token"
+    output_dir = Path("analysis/cknna") / f"{batches_label}_per-epoch{start_token_label}"
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "cknna_results.json"
-    with open(output_path, "w") as f:
-        json.dump(results, f, indent=2)
-    print(f"Saved CKNNA results to {output_path}")
+    for metric, records in results.items():
+        # the unnormalized file keeps its old name, so earlier runs and plot_cknna.py defaults still match
+        output_path = output_dir / ("cknna_results.json" if metric == "unnormalized" else f"cknna_{metric}_results.json")
+        with open(output_path, "w") as f:
+            json.dump(records, f, indent=2)
+        print(f"Saved CKNNA results to {output_path}")
 
     # plot the results, one figure per topk
     for topk in (5, 10, 25, 50):
         print(f'plotting CKNNA results for top-{topk}...')
-        plot_cknna_results(results, output_dir, topk=topk, plot_name="cknna_vs_epoch")
+        plot_cknna_results(results["unnormalized"], output_dir, topk=topk, plot_name="cknna_vs_epoch")

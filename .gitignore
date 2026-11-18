@@ -36,12 +36,16 @@ var/
 wheels/
 slurm/
 trained/
-analysis/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
+
+#results
+analysis/
+fig/
+slides/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -186,3 +190,6 @@ cython_debug/
 
 # logs
 *.out
+
+# ai
+CLAUDE.md

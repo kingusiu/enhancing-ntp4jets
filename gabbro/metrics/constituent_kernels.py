@@ -269,7 +269,9 @@ def make_pt_getter(feature_dict, pt_key: str = "part_pt") -> Callable[[torch.Ten
       * the forward transform is x' = (func(x) - subtract_by) * multiply_by.
     Only pT ratios within a jet matter: an overall scale cancels in the weights, so
     for func = log the subtract_by value is irrelevant, and a wrong multiply_by only
-    rescales beta.
+    rescales beta. For func = signed_log (sign(x) * log1p(|x| + eps), see
+    gabbro.utils.arrays) the inverse is expm1, which is not scale-covariant, so there
+    subtract_by and multiply_by must be right.
     """
     names = list(feature_dict.keys())
     col = names.index(pt_key)
@@ -284,6 +286,8 @@ def make_pt_getter(feature_dict, pt_key: str = "part_pt") -> Callable[[torch.Ten
             return y
         if func in ("np.log", "log", "torch.log", "numpy.log"):
             return torch.exp(y)
+        if func == "signed_log":  # inverse of gabbro.utils.arrays.signed_log, eps = 1e-5
+            return torch.sign(y) * (torch.expm1(y.abs()) - 1e-5)
         raise ValueError(f"no inverse implemented for func={func!r} of {pt_key}; add it in make_pt_getter")
 
     return pt_getter
@@ -407,6 +411,7 @@ def compare_pair_mmd(
     topks: Sequence[int] = (5, 10, 25, 50),
     n_sub: int = 1500,
     n_draws: int = 5,
+    n_perm: int = 5,
     device="cpu",
     seed: int = 0,
 ) -> list[dict]:
@@ -415,15 +420,93 @@ def compare_pair_mmd(
     sigma is set per model by the median heuristic and multiplied by each factor, so the
     factor means the same relative bandwidth in both models' embedding spaces.
     """
+    inferences = [constituent_inference(batches, model, pt_getter, n_jets, device) for model in (model_a, model_b)]
+    return compare_constituents_mmd(*inferences, n_jets=n_jets, betas=betas, sigma_factors=sigma_factors,
+                                    topks=topks, n_sub=n_sub, n_draws=n_draws, n_perm=n_perm,
+                                    device=device, seed=seed)
+
+
+def leading_constituents(inference, n_leading: int):
+    """Keep only the first n_leading constituents of every jet of a `constituent_inference` output.
+
+    "First" is the order of the input, which for AOJ / JetClass is descending pT. Jets with
+    fewer constituents keep all of them. bad_jets is passed through unchanged.
+    """
+    E, jet_idx, pt, bad_jets = inference
+    counts = torch.bincount(jet_idx)
+    first = torch.cumsum(counts, 0) - counts                 # index of each jet's first constituent
+    keep = torch.arange(len(jet_idx)) - first[jet_idx] < n_leading
+    return E[keep], jet_idx[keep], pt[keep], bad_jets
+
+
+def select_constituents(inference, n: int, mode: str = "hardest", seed: int = 0):
+    """Keep n constituents of every jet of a `constituent_inference` output.
+
+    mode: "hardest"  the first n in input order (descending pT for AOJ / JetClass)
+          "softest"  the last n
+          "random"   n chosen at random per jet; the choice depends only on `seed` and the jet
+                     structure, so two models' outputs (same jets) get the same constituents
+    Jets with at most n constituents keep all of them, whatever the mode. The kept
+    constituents stay grouped by jet and in input order. bad_jets is passed through.
+    """
+    E, jet_idx, pt, bad_jets = inference
+    counts = torch.bincount(jet_idx)
+    first = torch.cumsum(counts, 0) - counts
+    pos = torch.arange(len(jet_idx)) - first[jet_idx]          # position within the jet
+    if mode == "hardest":
+        keep = pos < n
+    elif mode == "softest":
+        keep = pos >= counts[jet_idx] - n
+    elif mode == "random":
+        g = torch.Generator().manual_seed(seed)
+        key = torch.rand(len(jet_idx), generator=g, dtype=torch.float64)
+        order = torch.argsort(jet_idx.double() * 2 + key)      # grouped by jet, random within jet
+        rank = torch.empty_like(order)
+        rank[order] = torch.arange(len(order))
+        keep = rank - first[jet_idx] < n
+    else:
+        raise ValueError(f"unknown mode {mode!r}")
+    return E[keep], jet_idx[keep], pt[keep], bad_jets
+
+
+def cut_batches_to_leading(batches, n_leading: int) -> list[dict]:
+    """Copies of `batches` in which only the first n_leading valid constituents of each jet remain.
+
+    The removed constituents are masked out and their features zeroed, so the model never
+    sees them (unlike `leading_constituents`, which cuts after inference).
+    """
+    out = []
+    for b in batches:
+        mask = b["part_mask"].bool()
+        keep = mask & (mask.int().cumsum(dim=1) <= n_leading)
+        # torch.where, not a product: a NaN feature times 0 would stay NaN
+        features = torch.where(keep.unsqueeze(-1), b["part_features"], torch.zeros_like(b["part_features"]))
+        out.append({**b, "part_mask": keep.to(b["part_mask"].dtype), "part_features": features})
+    return out
+
+
+def compare_constituents_mmd(
+    inference_a,
+    inference_b,
+    n_jets: int,
+    betas: Sequence[float] = (0.0, 0.5, 1.0, 2.0),
+    sigma_factors: Sequence[float] = (0.5, 1.0, 2.0),
+    topks: Sequence[int] = (5, 10, 25, 50),
+    n_sub: int = 1500,
+    n_draws: int = 5,
+    n_perm: int = 5,
+    device="cpu",
+    seed: int = 0,
+) -> list[dict]:
+    """The kernel and CKNNA part of `compare_pair_mmd`, on two `constituent_inference` outputs."""
     kernels, sigmas, bad = [], [], []
-    for model in (model_a, model_b):
-        E, jid, pt, bad_jets = constituent_inference(batches, model, pt_getter, n_jets, device)
+    for E, jid, pt, bad_jets in (inference_a, inference_b):
         bad.append(bad_jets)
         s0 = median_heuristic_sigma(E, seed=seed)
         sigmas.append(s0)
         Ks = mmd_kernels(E, jid, pt, n_jets, betas, [f * s0 for f in sigma_factors], device=device)
         kernels.append({(b, f): Ks[(b, f * s0)] for b in betas for f in sigma_factors})
-        del E, jid, pt, Ks
+        del Ks
 
     # drop jets that are non-finite in EITHER model, from both kernels
     keep = torch.ones(n_jets, dtype=torch.bool)
@@ -435,7 +518,7 @@ def compare_pair_mmd(
         for f in sigma_factors:
             Ka = kernels[0][(b, f)][keep][:, keep].to(device)
             Kb = kernels[1][(b, f)][keep][:, keep].to(device)
-            for r in cknna_sweep(Ka, Kb, topks, n_sub, n_draws, seed=seed):
+            for r in cknna_sweep(Ka, Kb, topks, n_sub, n_draws, n_perm=n_perm, seed=seed):
                 rows.append({"beta": b, "sigma_factor": f, "sigma_a": sigmas[0], "sigma_b": sigmas[1],
                              "n_jets_used": len(keep), **r})
     return rows
@@ -491,6 +574,32 @@ def _self_test():
     # an overall pT scale cancels
     assert torch.allclose(jet_weights(pt, jid, n_jets, 1.5), jet_weights(37 * pt, jid, n_jets, 1.5), atol=1e-6)
     print("weights: beta=0 uniform, invariant to overall pT scale")
+
+    # leading constituents: per jet the first min(n, count) constituents, in order
+    Ec, jc, pc, _ = leading_constituents((E, jid, pt, torch.tensor([])), 3)
+    assert torch.equal(torch.bincount(jc, minlength=n_jets), counts.clamp(max=3))
+    assert torch.equal(Ec, torch.cat([E[jid == j][:3] for j in range(n_jets)]))
+    mask = torch.arange(6)[None, :] < torch.tensor([[2], [6]])
+    feats = torch.randn(2, 6, 4)
+    feats[1, 5, 0] = float("nan")
+    cut = cut_batches_to_leading([{"part_mask": mask.int(), "part_features": feats}], 3)[0]
+    assert cut["part_mask"].sum(1).tolist() == [2, 3] and torch.isfinite(cut["part_features"]).all()
+    print("leading constituents: kept the first n per jet, after and before inference")
+
+    # select_constituents: hardest == leading_constituents, softest = last n, random = n distinct
+    # ones per jet, identical for the same seed, all kept in input order
+    inf = (E, jid, pt, torch.tensor([]))
+    assert torch.equal(select_constituents(inf, 3, "hardest")[0], Ec)
+    Es, js = select_constituents(inf, 3, "softest")[:2]
+    assert torch.equal(Es, torch.cat([E[jid == j][-3:] for j in range(n_jets)]))
+    Er, jr = select_constituents(inf, 3, "random", seed=5)[:2]
+    assert torch.equal(torch.bincount(jr, minlength=n_jets), counts.clamp(max=3))
+    assert torch.equal(Er, select_constituents(inf, 3, "random", seed=5)[0])
+    assert torch.all(jr[1:] >= jr[:-1])
+    for j in range(n_jets):   # random picks are distinct constituents of the right jet, in input order
+        rows = [torch.nonzero((E[jid == j] == e).all(1)).item() for e in Er[jr == j]]
+        assert rows == sorted(set(rows))
+    print("select_constituents: hardest / softest / random per jet, reproducible, input order kept")
 
 
 if __name__ == "__main__":
